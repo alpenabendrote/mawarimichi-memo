@@ -10,6 +10,6 @@ worker.onmessage = event => {
       lastUpdate = performance.now();
       worker.postMessage({ type: 'progress', completed });
     });
-    worker.postMessage({ type: 'done', result: { ...result, matches: output === event.data } }, [result.records.buffer as ArrayBuffer]);
+    worker.postMessage({ type: 'done', output, result: { ...result, matches: output === event.data } }, [result.records.buffer as ArrayBuffer]);
   } catch { worker.postMessage({ type: 'error' }); }
 };

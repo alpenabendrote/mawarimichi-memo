@@ -16,8 +16,10 @@ describe('copy diagnostics', () => {
     expect(html).toContain('全ビットの途中測定');
     expect(html).not.toContain('秘密');
   });
-  it('explains simulation errors without making the user repeat the native copy', () => {
-    const html = renderToStaticMarkup(<TeleportationPanel activity={{ status: 'error', source: '本文' }} />);
-    expect(html).toContain('通常のコピーには影響しません');
+  it('does not claim the copy succeeded when simulation failed', () => {
+    const html = renderToStaticMarkup(<TeleportationPanel activity={{ status: 'error', source: '本文', reason: 'simulation' }} />);
+    expect(html).toContain('コピーを中止しました');
+    expect(html).toContain('コピー失敗');
+    expect(html).not.toContain('コピー完了');
   });
 });

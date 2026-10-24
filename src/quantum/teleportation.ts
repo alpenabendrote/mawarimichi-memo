@@ -12,7 +12,7 @@ export interface TextTransfer {
   elapsed: number;
 }
 export type TransferSummary = Omit<TextTransfer, 'output'> & { matches: boolean };
-export type TransferMessage = { type: 'progress'; completed: number } | { type: 'done'; result: TransferSummary } | { type: 'error' };
+export type TransferMessage = { type: 'progress'; completed: number } | { type: 'done'; output: string; result: TransferSummary } | { type: 'error' };
 
 function gate(kind: Gate['kind'], target: number, controls: number[] = []): Gate {
   return { kind, target, controls, stage: 'prepare', iteration: 0 };

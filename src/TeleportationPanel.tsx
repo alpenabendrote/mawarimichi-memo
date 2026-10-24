@@ -25,10 +25,10 @@ export function TeleportationPanel({ activity }: { activity: CopyActivity }) {
   const index = result ? Math.min(bit, result.bitCount - 1) : 0;
   const measured = result ? decodeRecord(result.records[index]) : null;
   return <details className="quantum-details copy-details">
-    <summary>コピーの詳細{activity.status === 'running' ? '（転送中）' : ''}</summary>
+    <summary>コピーの詳細<span role="status">{activity.status === 'running' ? `（コピー中 ${activity.completed.toLocaleString()} / ${activity.total.toLocaleString()} bit）` : activity.status === 'done' ? '（コピー完了）' : '（コピー失敗）'}</span></summary>
     <div className="quantum-content">
       {activity.status === 'running' && <p className="quantum-caption">{activity.source}の選択範囲を転送しています。{activity.completed.toLocaleString()} / {activity.total.toLocaleString()} bit</p>}
-      {activity.status === 'error' && <p role="status">転送をシミュレーションできませんでした。通常のコピーには影響しません。</p>}
+      {activity.status === 'error' && <p role="alert">{activity.reason === 'clipboard' ? 'クリップボードに書き込めませんでした。ブラウザの書き込み許可を確認してから、もう一度コピーしてください。' : '転送をシミュレーションできなかったため、コピーを中止しました。'}</p>}
       {result && measured && <>
         <p className="quantum-caption" role="status">{activity.source}の選択範囲：{result.bitCount.toLocaleString()} bit ／ {result.matches ? '全ビット一致' : '不一致あり'} ／ {result.elapsed.toFixed(1)} ms</p>
         <div className="bit-position"><label>ビット <input aria-label="転送したビットの番号" type="number" min="1" max={result.bitCount} value={index + 1} onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value)) setBit(Math.max(0, Math.min(result.bitCount - 1, Math.trunc(value) - 1))); }} /></label><span>/ {result.bitCount.toLocaleString()}</span></div>
@@ -37,7 +37,7 @@ export function TeleportationPanel({ activity }: { activity: CopyActivity }) {
         <div className="state-table-wrap"><table className="state-table"><caption>全ビットの途中測定（m0, m1）</caption><thead><tr><th>測定値</th><th>回数</th><th>割合</th></tr></thead><tbody>{result.counts.map((count, pair) => <tr key={pair}><td><code>{pair.toString(2).padStart(2, '0')}</code></td><td>{count.toLocaleString()}</td><td>{(count / result.bitCount * 100).toFixed(2)}%</td></tr>)}</tbody></table></div>
         <p className="quantum-caption">q0は入力、q1・q2はもつれたペアです。q0・q1を測定し、その2ビットでq2を補正してから測定します。灰色の補正ゲートは実行していません。</p>
       </>}
-      <p className="quantum-caption">通常のコピーに連動して、選択範囲をブラウザ内で転送・照合します。UTF-16の各文字コードを上位ビットから処理し、1ビットごとに3量子ビットを使います。コピーし直すと結果を更新します。</p>
+      <p className="quantum-caption">選択範囲をブラウザ内で転送し、受信した測定結果から復元した文字列をコピーします。UTF-16の各文字コードを上位ビットから処理し、1ビットごとに3量子ビットを使います。コピーし直すと結果を更新します。</p>
     </div>
   </details>;
 }
