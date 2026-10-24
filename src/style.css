@@ -6,8 +6,8 @@ button { cursor: pointer; border: 1px solid #ccc; background: #fff; border-radiu
 button:hover:not(:disabled) { background: #f3f3f3; }
 button:disabled { color: #aaa; cursor: default; }
 :focus-visible { outline: 2px solid #666; outline-offset: 2px; }
-.notepad { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100vh; }
-.sidebar { border-right: 1px solid #ddd; padding: 18px 12px; height: 100vh; position: sticky; top: 0; display: flex; flex-direction: column; gap: 16px; }
+.notepad { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: 100dvh; overflow: hidden; }
+.sidebar { min-height: 0; border-right: 1px solid #ddd; padding: 18px 12px; display: flex; flex-direction: column; gap: 16px; }
 .list-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .list-header h1 { font-size: 15px; margin: 0; font-weight: 600; }
 .filter { width: 100%; min-width: 0; border: 1px solid #ddd; border-radius: 2px; padding: 6px 8px; font-size: 12px; }
@@ -17,12 +17,18 @@ button:disabled { color: #aaa; cursor: default; }
 .list-footer { border-top: 1px solid #eee; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #777; }
 .list-footer > * { white-space: nowrap; }
 .link-button { background: none; border: 0; padding: 0; text-decoration: underline; font-size: 12px; color: #666; }
-.main { min-width: 0; padding: 20px 32px; display: flex; flex-direction: column; }
-.note-toolbar { position: sticky; top: 0; z-index: 3; background: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; padding: 10px 0; border-bottom: 1px solid #eee; }
+.main { min-width: 0; min-height: 0; padding: 10px 24px; display: flex; flex-direction: column; }
+.note-toolbar { flex-shrink: 0; background: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #eee; }
 .note-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .note-toolbar button { white-space: nowrap; }
 .note-toolbar .muted { font-size: 11px; }
 .observe-button { border-color: #777; }
+.workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+.note-pane, .calculation-pane { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.note-pane { padding: 10px 24px 20px 0; }
+.calculation-pane { border-left: 1px solid #eee; padding: 10px 0 20px 24px; }
+.calculation-pane > .quantum-details:first-child { border-top: 0; }
+.view-switch { display: none; }
 .editor { display: flex; flex-direction: column; }
 .note-title { background: transparent; border: 0; border-bottom: 1px solid #eee; border-radius: 0; padding: 9px 0 12px; width: 100%; font-size: 20px; font-weight: 500; }
 .note-body { width: 100%; resize: vertical; border: 0; padding: 12px 0; min-height: 128px; max-height: 360px; overflow-y: auto; line-height: 1.9; font-size: 14px; background: transparent; }
@@ -79,15 +85,22 @@ button:disabled { color: #aaa; cursor: default; }
 code { font: 11px ui-monospace, Consolas, monospace; }
 .skip-link { position: fixed; left: 10px; top: -60px; background: white; padding: 8px; border: 1px solid #555; z-index: 2; }
 .skip-link:focus { top: 10px; }
-@media (min-width: 1300px) { .main { padding-left: 48px; padding-right: 48px; } }
+@media (max-width: 1050px) {
+  .workspace { display: block; }
+  .note-pane, .calculation-pane { height: 100%; padding: 10px 0 20px; border: 0; }
+  .view-note .calculation-pane, .view-calculation .note-pane { display: none; }
+  .view-switch { display: flex; flex-shrink: 0; gap: 20px; border-bottom: 1px solid #eee; }
+  .view-switch button { border: 0; border-radius: 0; padding: 9px 0; color: #888; border-bottom: 2px solid transparent; }
+  .view-switch button[aria-pressed="true"] { color: #222; border-bottom-color: #555; }
+}
 @media (max-width: 650px) {
-  .notepad { display: block; }
-  .sidebar { position: static; height: auto; padding: 14px 16px; border-right: 0; border-bottom: 1px solid #ddd; gap: 10px; }
+  .notepad { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .sidebar { max-height: min(230px, 36dvh); padding: 10px 16px; border-right: 0; border-bottom: 1px solid #ddd; gap: 6px; }
   .list-header h1 { font-size: 14px; }
-  .note-list { max-height: 140px; }
+  .note-list { max-height: 100px; }
   .note-list button { padding: 6px 8px; }
   .list-footer { padding-top: 7px; }
-  .main { padding: 16px; }
+  .main { padding: 0 16px 8px; }
   .note-title { font-size: 18px; }
   .measurement-position { gap: 8px; }
 }

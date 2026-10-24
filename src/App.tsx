@@ -29,6 +29,8 @@ export function App() {
   const [measurementStep, setMeasurementStep] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<{ note: Note; index: number } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [view, setView] = useState<'note' | 'calculation'>('note');
+  const [transferTarget, setTransferTarget] = useState<HTMLDivElement | null>(null);
   const [walkRecord, setWalkRecord] = useState<WalkRecord | null>(null);
   const [walkDetailsOpen, setWalkDetailsOpen] = useState(false);
   const [duplication, setDuplication] = useState<TransferActivity | null>(null);
@@ -56,6 +58,7 @@ export function App() {
   function selectNote(id: string) {
     clearDuplicate();
     setActiveId(id); setOpenedId(null); setMeasurementStep(null); setMessage('');
+    setView('note');
   }
   function newNote() {
     if (notes.length >= MAX_NOTES) return;
@@ -63,6 +66,7 @@ export function App() {
     const note: Note = { id: crypto.randomUUID(), title: '', body: '', updatedAt: new Date().toISOString() };
     setNotes(previous => [note, ...previous]);
     setActiveId(note.id); setOpenedId(note.id); setFilter(''); setMeasurementStep(null); setMessage('');
+    setView('note');
     requestAnimationFrame(() => titleRef.current?.focus());
   }
   function editNote(field: 'title' | 'body', value: string) {
@@ -164,12 +168,23 @@ export function App() {
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       {active && trace ? <>
         <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? 'メモは最大16件です。' : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
-        <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
-        <QuantumWalkPanel record={walkRecord} open={walkDetailsOpen} onOpenChange={setWalkDetailsOpen} />
-        <TeleportationPanel activity={duplication} operation="duplicate" open={duplicateDetailsOpen} onOpenChange={setDuplicateDetailsOpen} />
-        <SimilarNotes notes={notes} activeId={active.id} onSelect={selectNote} />
+        <div className="view-switch" role="group" aria-label="表示する欄">
+          <button aria-pressed={view === 'note'} aria-controls="note-pane" onClick={() => setView('note')}>メモ</button>
+          <button aria-pressed={view === 'calculation'} aria-controls="calculation-pane" onClick={() => setView('calculation')}>回路・計算</button>
+        </div>
+        <div className={`workspace view-${view}`}>
+          <section id="note-pane" className="note-pane" aria-label="メモ欄" tabIndex={0}>
+            <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
+          </section>
+          <section id="calculation-pane" className="calculation-pane" aria-label="回路・計算欄" tabIndex={0}>
+            <QuantumPanel trace={trace} notes={notes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
+            <QuantumWalkPanel record={walkRecord} open={walkDetailsOpen} onOpenChange={setWalkDetailsOpen} />
+            <TeleportationPanel activity={duplication} operation="duplicate" open={duplicateDetailsOpen} onOpenChange={setDuplicateDetailsOpen} />
+            <div ref={setTransferTarget} />
+            <SimilarNotes notes={notes} activeId={active.id} onSelect={selectNote} />
+          </section>
+        </div>
         <p className="observation-message" role="status">{message}</p>
-        <QuantumPanel trace={trace} notes={notes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
       </> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
     </main>
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
