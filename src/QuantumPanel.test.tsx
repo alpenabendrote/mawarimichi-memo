@@ -2,43 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QuantumPanel } from './QuantumPanel';
 import { starterNotes } from './notes';
-import { sealedLabels } from './sealed';
-import { measureSearchAt, prepareSearch, runSearch } from './quantum/simulator';
+import { prepareSearch } from './quantum/simulator';
+import { observeNote } from './observation';
 
-describe('circuit display and opening', () => {
-  const notes = starterNotes();
-  const labels = sealedLabels(notes.map(note => note.id));
-  const callbacks = { onOpenNote: () => {}, onMeasure: () => {} };
-
-  it('shows the current probability without leaking any real title before opening', () => {
-    const result = prepareSearch(4, 3);
-    const html = renderToStaticMarkup(<QuantumPanel run={{ result, notes: labels, elapsed: 1, sealed: true }} {...callbacks} />);
-    expect(html).toContain('まだ開封していません');
-    expect(html).toContain('この位置で測定して開封');
-    expect(html).toContain('25.0');
-    for (const note of notes) {
-      expect(html).not.toContain(note.title);
-      expect(html).not.toContain(note.body);
-    }
-  });
-
-  it('shows an honest miss after an early measurement and removes the measurement button', () => {
-    const prepared = prepareSearch(4, 3);
-    const result = measureSearchAt(prepared, prepared.qubits, () => 0.01);
-    const html = renderToStaticMarkup(<QuantumPanel run={{ result, notes: labels, elapsed: 1, sealed: true }} {...callbacks} />);
-    expect(result.measured).toBe(0);
-    expect(html).toContain('別のメモが出ました');
-    expect(html).toContain('メモA');
-    expect(html).not.toContain('この位置で測定して開封');
-    for (const note of notes) expect(html).not.toContain(note.title);
-  });
-
-  it('keeps ordinary search readable and fully measured', () => {
-    const result = runSearch(4, 2, () => 0.5);
-    const html = renderToStaticMarkup(<QuantumPanel run={{ result, notes: notes.map(note => ({ id: note.id, title: note.title })), elapsed: 1 }} {...callbacks} />);
+describe('simple quantum search', () => {
+  const notes = starterNotes().map(note => ({ id: note.id, title: note.title }));
+  it('defaults to the last position and uses a single disclosure for circuit and state', () => {
+    const trace = prepareSearch(4, 2);
+    const html = renderToStaticMarkup(<QuantumPanel trace={trace} notes={notes} step={null} onStep={() => {}} />);
+    expect(html.match(/<details/g)).toHaveLength(1);
+    expect(html).toContain('<summary>回路と状態</summary>');
+    expect(html).toContain(`value="${trace.snapshots.length - 1}"`);
+    expect(html).toContain('100.00');
+    expect(html).toContain('測定前の状態');
     expect(html).toContain(notes[2].title);
-    expect(html).toContain('指定されたメモを発見しました');
-    expect(html).toContain('100.0');
     expect(html).not.toContain('この位置で測定して開封');
+    expect(html).not.toContain('操作を再生');
+  });
+  it('measures directly at the final position without a separate opening step', () => {
+    const result = observeNote(4, 2, null, () => 0.01);
+    expect(result.measured).toBe(2);
+    expect(result.iterations).toBe(1);
+    expect(result.probabilities[2]).toBeCloseTo(1);
+  });
+  it('uses an explicitly chosen earlier position and reports its real outcome', () => {
+    const trace = prepareSearch(4, 2);
+    const result = observeNote(4, 2, trace.qubits, () => 0.01);
+    expect(result.measured).toBe(0);
+    expect(result.probabilities[2]).toBeCloseTo(0.25);
+    const html = renderToStaticMarkup(<QuantumPanel trace={trace} notes={notes} step={trace.qubits} onStep={() => {}} />);
+    expect(html).toContain('25.00');
   });
 });
