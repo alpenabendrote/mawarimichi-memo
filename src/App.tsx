@@ -12,9 +12,15 @@ import { SimilarNotes } from './SimilarNotes';
 import { HelpDialog } from './HelpDialog';
 import { runWalk } from './quantum/walk';
 import { QuantumWalkPanel, type WalkRecord } from './QuantumWalkPanel';
+import { initializeZenoNotes, orderZenoNotes, readNoteZeno, type ZenoReadRecord } from './zenoNotes';
+import { newZenoMemory } from './quantum/zeno';
+import { ZenoPanel } from './ZenoPanel';
 
 function initialNotebook() {
-  try { return loadNotes(window.localStorage); }
+  try {
+    const result = loadNotes(window.localStorage);
+    return { ...result, notes: initializeZenoNotes(result.notes, Date.now()) };
+  }
   catch { return loadNotes({ getItem: () => { throw new Error('Storage unavailable'); } }); }
 }
 
@@ -26,6 +32,9 @@ export function App() {
   const [filter, setFilter] = useState('');
   const [saveError, setSaveError] = useState<string | null>(initial.error);
   const [message, setMessage] = useState('');
+  const [listTime, setListTime] = useState(Date.now);
+  const [zenoRecord, setZenoRecord] = useState<ZenoReadRecord | null>(null);
+  const [zenoDetailsOpen, setZenoDetailsOpen] = useState(false);
   const [measurementStep, setMeasurementStep] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<{ note: Note; index: number } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -39,10 +48,12 @@ export function App() {
   const currentNotebook = useRef({ notes, activeId });
   currentNotebook.current = { notes, activeId };
   const titleRef = useRef<HTMLInputElement>(null);
+  const display = useMemo(() => orderZenoNotes(notes, listTime), [notes, listTime]);
+  const orderedNotes = useMemo(() => display.map(entry => entry.note), [display]);
   const active = notes.find(note => note.id === activeId);
-  const target = notes.findIndex(note => note.id === activeId);
+  const target = orderedNotes.findIndex(note => note.id === activeId);
   const trace = useMemo(() => target < 0 ? null : prepareSearch(notes.length, target), [notes.length, target]);
-  const visibleNotes = notes.filter(note => noteTitle(note).toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
+  const visibleNotes = display.filter(({ note }) => noteTitle(note).toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
 
   useEffect(() => () => { duplicateJob.current?.cancel(); }, []);
 
@@ -59,14 +70,17 @@ export function App() {
     clearDuplicate();
     setActiveId(id); setOpenedId(null); setMeasurementStep(null); setMessage('');
     setView('note');
+    setListTime(Date.now());
   }
   function newNote() {
     if (notes.length >= MAX_NOTES) return;
     clearDuplicate();
-    const note: Note = { id: crypto.randomUUID(), title: '', body: '', updatedAt: new Date().toISOString() };
+    const now = Date.now();
+    const note: Note = { id: crypto.randomUUID(), title: '', body: '', updatedAt: new Date(now).toISOString(), zeno: newZenoMemory(now) };
     setNotes(previous => [note, ...previous]);
     setActiveId(note.id); setOpenedId(note.id); setFilter(''); setMeasurementStep(null); setMessage('');
     setView('note');
+    setListTime(now);
     requestAnimationFrame(() => titleRef.current?.focus());
   }
   function editNote(field: 'title' | 'body', value: string) {
@@ -75,16 +89,20 @@ export function App() {
       duplicateJob.current.cancel(); duplicateJob.current = null;
       setDuplication({ status: 'cancelled', source: 'タイトル・本文' });
     }
-    setNotes(previous => previous.map(note => note.id === activeId ? { ...note, [field]: value, updatedAt: new Date().toISOString() } : note));
+    const now = Date.now();
+    setNotes(previous => previous.map(note => note.id === activeId ? { ...note, [field]: value, updatedAt: new Date(now).toISOString(), zeno: newZenoMemory(now) } : note));
+    setListTime(now);
   }
   function deleteNote() {
     if (!active) return;
     clearDuplicate();
     const index = notes.indexOf(active);
     const remaining = notes.filter(note => note.id !== active.id);
+    const remainingDisplay = orderedNotes.filter(note => note.id !== active.id);
     setDeleted({ note: active, index }); setNotes(remaining);
-    setActiveId(remaining[Math.min(index, remaining.length - 1)]?.id ?? null);
+    setActiveId(remainingDisplay[Math.min(orderedNotes.indexOf(active), remainingDisplay.length - 1)]?.id ?? null);
     setOpenedId(null); setMeasurementStep(null); setMessage('');
+    setListTime(Date.now());
   }
   function undoDelete() {
     if (!deleted || notes.length >= MAX_NOTES) return;
@@ -104,17 +122,24 @@ export function App() {
     try {
       const start = performance.now();
       const result = observeNote(notes.length, target, measurementStep);
-      const found = notes[result.measured];
+      const found = orderedNotes[result.measured];
       if (found) {
+        recordReading(found.id, 'search');
         setActiveId(found.id); setOpenedId(found.id); setFilter('');
         setMessage(result.measured === target
           ? `観測しました。${(performance.now() - start).toFixed(2)} ms`
           : `「${noteTitle(active)}」ではなく「${noteTitle(found)}」を観測しました。`);
       } else {
+        setListTime(Date.now());
         setOpenedId(null); setMessage('空き状態を観測しました。本文は伏せたままです。');
       }
       setMeasurementStep(null);
     } catch (error) { setMessage(error instanceof Error ? error.message : '観測できませんでした。'); }
+  }
+
+  function recordReading(id: string, reason: ZenoReadRecord['reason']) {
+    const result = readNoteZeno(notes, id, reason, Date.now());
+    setNotes(result.notes); setZenoRecord(result.record); setListTime(result.record.run.at);
   }
 
   function duplicateNote() {
@@ -129,11 +154,13 @@ export function App() {
         const latest = currentNotebook.current;
         const original = latest.notes.find(note => note.id === source.id);
         if (latest.activeId !== source.id || !original || original.title !== source.title || original.body !== source.body) return false;
-        const copy = receivedDuplicate(output, crypto.randomUUID(), new Date().toISOString());
+        const now = Date.now();
+        const copy = { ...receivedDuplicate(output, crypto.randomUUID(), new Date(now).toISOString()), zeno: newZenoMemory(now) };
         const next = addDuplicate(latest.notes, source.id, copy);
         if (!next) return false;
         setNotes(next); setActiveId(copy.id); setOpenedId(copy.id);
         setFilter(''); setMeasurementStep(null);
+        setListTime(now);
         return true;
       },
       onProgress: completed => setDuplication({ status: 'running', source: 'タイトル・本文', completed, total: payload.length * 16 }),
@@ -148,8 +175,9 @@ export function App() {
     clearDuplicate();
     try {
       const run = runWalk(notes.length, target);
-      const found = notes[run.measured];
-      setWalkRecord({ run, notes: notes.map(note => ({ id: note.id, title: noteTitle(note) })) });
+      const found = orderedNotes[run.measured];
+      recordReading(found.id, 'walk');
+      setWalkRecord({ run, notes: orderedNotes.map(note => ({ id: note.id, title: noteTitle(note) })) });
       setActiveId(found.id); setOpenedId(found.id); setFilter(''); setMeasurementStep(null);
       setMessage(`おまかせで「${noteTitle(found)}」を開きました。`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'おまかせを実行できませんでした。'); }
@@ -160,7 +188,7 @@ export function App() {
     <aside className="sidebar" aria-label="メモ一覧">
       <header className="list-header"><h1>メモ帳</h1><button onClick={newNote} disabled={notes.length >= MAX_NOTES}>新規</button></header>
       <input className="filter" aria-label="タイトルを絞り込む" placeholder="タイトルを絞り込む" value={filter} onChange={event => setFilter(event.target.value)} />
-      <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(note => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}>{noteTitle(note)}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
+      <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
       <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes}>JSONを書き出す</button></footer>
     </aside>
     <main className="main">
@@ -177,11 +205,12 @@ export function App() {
             <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
           </section>
           <section id="calculation-pane" className="calculation-pane" aria-label="回路・計算欄" tabIndex={0}>
-            <QuantumPanel trace={trace} notes={notes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
+            <QuantumPanel trace={trace} notes={orderedNotes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
+            <ZenoPanel note={active} at={listTime} record={zenoRecord} open={zenoDetailsOpen} onOpenChange={setZenoDetailsOpen} />
             <QuantumWalkPanel record={walkRecord} open={walkDetailsOpen} onOpenChange={setWalkDetailsOpen} />
             <TeleportationPanel activity={duplication} operation="duplicate" open={duplicateDetailsOpen} onOpenChange={setDuplicateDetailsOpen} />
             <div ref={setTransferTarget} />
-            <SimilarNotes notes={notes} activeId={active.id} onSelect={selectNote} />
+            <SimilarNotes notes={orderedNotes} activeId={active.id} onSelect={selectNote} />
           </section>
         </div>
         <p className="observation-message" role="status">{message}</p>

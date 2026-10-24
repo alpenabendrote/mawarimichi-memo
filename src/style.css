@@ -12,7 +12,9 @@ button:disabled { color: #aaa; cursor: default; }
 .list-header h1 { font-size: 15px; margin: 0; font-weight: 600; }
 .filter { width: 100%; min-width: 0; border: 1px solid #ddd; border-radius: 2px; padding: 6px 8px; font-size: 12px; }
 .note-list { flex: 1; min-height: 0; overflow-y: auto; }
-.note-list button { display: block; width: 100%; border: 0; background: transparent; text-align: left; padding: 9px 8px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 0; }
+.note-list button { display: flex; align-items: baseline; gap: 8px; width: 100%; border: 0; background: transparent; text-align: left; padding: 9px 8px; font-size: 13px; white-space: nowrap; border-radius: 0; }
+.note-list-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dormant-label { margin-left: auto; flex-shrink: 0; font-size: 10px; color: #888; }
 .note-list button.selected { background: #eee; }
 .list-footer { border-top: 1px solid #eee; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #777; }
 .list-footer > * { white-space: nowrap; }

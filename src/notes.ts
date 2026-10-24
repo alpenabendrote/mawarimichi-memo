@@ -1,6 +1,7 @@
 import { MAX_NOTES } from './quantum/simulator';
+import { isZenoMemory, type ZenoMemory } from './quantum/zeno';
 
-export interface Note { id: string; title: string; body: string; updatedAt: string }
+export interface Note { id: string; title: string; body: string; updatedAt: string; zeno?: ZenoMemory }
 export const STORAGE_KEY = 'quantum-notepad.notes.v1';
 
 export function starterNotes(): Note[] {
@@ -24,7 +25,8 @@ export function parseNotes(raw: string): Note[] {
       throw new Error('保存データが不正です。');
     }
     ids.add(note.id);
-    return { id: note.id, title: note.title, body: note.body, updatedAt: note.updatedAt };
+    return { id: note.id, title: note.title, body: note.body, updatedAt: note.updatedAt,
+      ...(isZenoMemory(note.zeno) ? { zeno: { basis: note.zeno.basis, at: note.zeno.at } } : {}) };
   });
 }
 
