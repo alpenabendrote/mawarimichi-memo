@@ -10,6 +10,8 @@ import TeleportWorker from './quantum/teleport.worker?worker&inline';
 import { TeleportationPanel } from './TeleportationPanel';
 import { SimilarNotes } from './SimilarNotes';
 import { HelpDialog } from './HelpDialog';
+import { runWalk } from './quantum/walk';
+import { QuantumWalkPanel, type WalkRecord } from './QuantumWalkPanel';
 
 function initialNotebook() {
   try { return loadNotes(window.localStorage); }
@@ -27,6 +29,8 @@ export function App() {
   const [measurementStep, setMeasurementStep] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<{ note: Note; index: number } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [walkRecord, setWalkRecord] = useState<WalkRecord | null>(null);
+  const [walkDetailsOpen, setWalkDetailsOpen] = useState(false);
   const [duplication, setDuplication] = useState<TransferActivity | null>(null);
   const [duplicateDetailsOpen, setDuplicateDetailsOpen] = useState(false);
   const duplicateJob = useRef<{ cancel: () => void } | null>(null);
@@ -135,6 +139,18 @@ export function App() {
     });
   }
 
+  function openNextNote() {
+    if (!active || notes.length < 2) return;
+    clearDuplicate();
+    try {
+      const run = runWalk(notes.length, target);
+      const found = notes[run.measured];
+      setWalkRecord({ run, notes: notes.map(note => ({ id: note.id, title: noteTitle(note) })) });
+      setActiveId(found.id); setOpenedId(found.id); setFilter(''); setMeasurementStep(null);
+      setMessage(`おまかせで「${noteTitle(found)}」を開きました。`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'おまかせを実行できませんでした。'); }
+  }
+
   return <div className="notepad">
     <a className="skip-link" href="#note-editor">本文へ移動</a>
     <aside className="sidebar" aria-label="メモ一覧">
@@ -147,8 +163,9 @@ export function App() {
       {saveError && <p role="alert" className="notice error">{saveError}</p>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       {active && trace ? <>
-        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? 'メモは最大16件です。' : undefined}>複製</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
+        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? 'メモは最大16件です。' : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
         <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
+        <QuantumWalkPanel record={walkRecord} open={walkDetailsOpen} onOpenChange={setWalkDetailsOpen} />
         <TeleportationPanel activity={duplication} operation="duplicate" open={duplicateDetailsOpen} onOpenChange={setDuplicateDetailsOpen} />
         <SimilarNotes notes={notes} activeId={active.id} onSelect={selectNote} />
         <p className="observation-message" role="status">{message}</p>

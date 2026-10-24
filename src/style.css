@@ -19,7 +19,8 @@ button:disabled { color: #aaa; cursor: default; }
 .link-button { background: none; border: 0; padding: 0; text-decoration: underline; font-size: 12px; color: #666; }
 .main { min-width: 0; padding: 20px 32px; display: flex; flex-direction: column; }
 .note-toolbar { position: sticky; top: 0; z-index: 3; background: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; padding: 10px 0; border-bottom: 1px solid #eee; }
-.note-toolbar > div { display: flex; gap: 8px; }
+.note-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.note-toolbar button { white-space: nowrap; }
 .note-toolbar .muted { font-size: 11px; }
 .observe-button { border-color: #777; }
 .editor { display: flex; flex-direction: column; }
@@ -52,6 +53,7 @@ button:disabled { color: #aaa; cursor: default; }
 .wire { stroke: #bbb; stroke-width: 1; }
 .gate rect { fill: white; stroke: #999; }
 .gate circle { fill: #555; }
+.gate circle.open-control { fill: white; stroke: #777; }
 .control-wire { stroke: #777; }
 .gate.unused { opacity: .3; }
 .measurement-marker line { stroke: #222; stroke-dasharray: 3 3; }
