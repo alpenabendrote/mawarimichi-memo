@@ -25,6 +25,7 @@ export interface SearchRun {
   probabilities: number[];
   measured: number;
 }
+export type PreparedSearch = Omit<SearchRun, 'measured'> & { measured: null };
 export const MAX_NOTES = 16;
 
 export function zeroState(qubits: number): StateVector {
@@ -155,23 +156,33 @@ export function secureRandom(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 }
 
-export function runSearch(count: number, target: number, random = secureRandom): SearchRun {
+/** Calculate gate snapshots without drawing a measurement outcome. */
+export function prepareSearch(count: number, target: number): PreparedSearch {
   const { qubits, iterations, gates } = createCircuit(count, target);
   let state = zeroState(qubits);
   const snapshots: Snapshot[] = [{ gate: null, state: state.slice() }];
-  let distribution: number[] = [], measured = 0;
   for (const gate of gates) {
-    if (gate.kind === 'M') {
-      distribution = probabilities(state);
-      const result = measure(state, random);
-      measured = result.index;
-      state = result.state;
-    } else {
-      state = applyGate(state, gate);
-    }
+    if (gate.kind === 'M') break;
+    state = applyGate(state, gate);
     snapshots.push({ gate, state: state.slice() });
   }
-  return { count, target, qubits, dimension: 2 ** qubits, iterations, gates, snapshots, probabilities: distribution, measured };
+  return { count, target, qubits, dimension: 2 ** qubits, iterations, gates, snapshots, probabilities: probabilities(state), measured: null };
+}
+
+/** Measure the chosen snapshot and stop there; discard all future unitary gates. */
+export function measureSearchAt(prepared: PreparedSearch, step: number, random = secureRandom): SearchRun {
+  if (!Number.isInteger(step) || step < 0 || step >= prepared.snapshots.length) throw new Error('測定位置が不正です。');
+  const state = prepared.snapshots[step].state;
+  const result = measure(state, random);
+  const measurement: Gate = { kind: 'M', target: null, controls: [], stage: 'measure', iteration: 0 };
+  const executed = prepared.gates.slice(0, step);
+  const completed = executed.filter((gate, index) => gate.stage === 'diffusion' && prepared.gates[index + 1]?.stage !== 'diffusion').length;
+  return { ...prepared, iterations: completed, gates: [...executed, measurement], snapshots: [...prepared.snapshots.slice(0, step + 1), { gate: measurement, state: result.state }], probabilities: probabilities(state), measured: result.index };
+}
+
+export function runSearch(count: number, target: number, random = secureRandom): SearchRun {
+  const prepared = prepareSearch(count, target);
+  return measureSearchAt(prepared, prepared.snapshots.length - 1, random);
 }
 
 export function basisLabel(index: number, qubits: number): string {

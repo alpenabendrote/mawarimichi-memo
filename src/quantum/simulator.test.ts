@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyGate, createCircuit, measure, optimalIterations, probabilities, runSearch, zeroState, type Gate } from './simulator';
+import { applyGate, createCircuit, measure, measureSearchAt, optimalIterations, prepareSearch, probabilities, runSearch, zeroState, type Gate } from './simulator';
 
 const gate = (kind: Gate['kind'], target: number, controls: number[] = []): Gate => ({ kind, target, controls, stage: 'prepare', iteration: 0 });
 
@@ -34,6 +34,23 @@ describe('unitary state-vector engine', () => {
 });
 
 describe('Grover circuit', () => {
+  it('does not draw an outcome until measurement and supports early stopping', () => {
+    const prepared = prepareSearch(16, 4);
+    expect(prepared.measured).toBeNull();
+    expect(prepared.snapshots.at(-1)!.gate!.kind).not.toBe('M');
+    const early = measureSearchAt(prepared, prepared.qubits, () => 0.01);
+    expect(early.probabilities[4]).toBeCloseTo(1 / 16);
+    expect(early.measured).toBe(0);
+    expect(early.iterations).toBe(0);
+    expect(early.gates.at(-1)!.kind).toBe('M');
+    expect(early.gates).toHaveLength(prepared.qubits + 1);
+    expect(early.snapshots).toHaveLength(early.gates.length + 1);
+    const full = measureSearchAt(prepared, prepared.snapshots.length - 1, () => 0.5);
+    expect(full.probabilities[4]).toBeCloseTo(0.9613189697265625);
+    expect(full.iterations).toBe(3);
+    expect(prepared.measured).toBeNull();
+    expect(() => measureSearchAt(prepared, prepared.snapshots.length)).toThrow();
+  });
   it('matches the independent analytical success probability for every supported count and target', () => {
     for (let count = 1; count <= 16; count++) {
       for (let target = 0; target < count; target++) {
