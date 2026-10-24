@@ -4,6 +4,10 @@ import { MAX_NOTES, prepareSearch } from './quantum/simulator';
 import { QuantumPanel } from './QuantumPanel';
 import { NoteEditor } from './NoteEditor';
 import { observeNote } from './observation';
+import { addDuplicate, duplicatePayload, receivedDuplicate } from './duplicateNote';
+import { startTextTransfer, type TransferActivity } from './quantum/transfer';
+import TeleportWorker from './quantum/teleport.worker?worker&inline';
+import { TeleportationPanel } from './TeleportationPanel';
 
 function initialNotebook() {
   try { return loadNotes(window.localStorage); }
@@ -20,11 +24,17 @@ export function App() {
   const [message, setMessage] = useState('');
   const [measurementStep, setMeasurementStep] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<{ note: Note; index: number } | null>(null);
+  const [duplication, setDuplication] = useState<TransferActivity | null>(null);
+  const duplicateJob = useRef<{ cancel: () => void } | null>(null);
+  const currentNotebook = useRef({ notes, activeId });
+  currentNotebook.current = { notes, activeId };
   const titleRef = useRef<HTMLInputElement>(null);
   const active = notes.find(note => note.id === activeId);
   const target = notes.findIndex(note => note.id === activeId);
   const trace = useMemo(() => target < 0 ? null : prepareSearch(notes.length, target), [notes.length, target]);
   const visibleNotes = notes.filter(note => noteTitle(note).toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
+
+  useEffect(() => () => { duplicateJob.current?.cancel(); }, []);
 
   useEffect(() => {
     if (!initial.writable) return;
@@ -32,11 +42,16 @@ export function App() {
     catch { setSaveError('保存できません。JSONを書き出して内容を保存してください。'); }
   }, [notes, initial.writable]);
 
+  function clearDuplicate() {
+    duplicateJob.current?.cancel(); duplicateJob.current = null; setDuplication(null);
+  }
   function selectNote(id: string) {
+    clearDuplicate();
     setActiveId(id); setOpenedId(null); setMeasurementStep(null); setMessage('');
   }
   function newNote() {
     if (notes.length >= MAX_NOTES) return;
+    clearDuplicate();
     const note: Note = { id: crypto.randomUUID(), title: '', body: '', updatedAt: new Date().toISOString() };
     setNotes(previous => [note, ...previous]);
     setActiveId(note.id); setOpenedId(note.id); setFilter(''); setMeasurementStep(null); setMessage('');
@@ -44,10 +59,15 @@ export function App() {
   }
   function editNote(field: 'title' | 'body', value: string) {
     if (field === 'body' && openedId !== activeId) return;
+    if (duplicateJob.current) {
+      duplicateJob.current.cancel(); duplicateJob.current = null;
+      setDuplication({ status: 'cancelled', source: 'タイトル・本文' });
+    }
     setNotes(previous => previous.map(note => note.id === activeId ? { ...note, [field]: value, updatedAt: new Date().toISOString() } : note));
   }
   function deleteNote() {
     if (!active) return;
+    clearDuplicate();
     const index = notes.indexOf(active);
     const remaining = notes.filter(note => note.id !== active.id);
     setDeleted({ note: active, index }); setNotes(remaining);
@@ -68,6 +88,7 @@ export function App() {
   }
   function observe() {
     if (!active) return;
+    clearDuplicate();
     try {
       const start = performance.now();
       const result = observeNote(notes.length, target, measurementStep);
@@ -84,6 +105,32 @@ export function App() {
     } catch (error) { setMessage(error instanceof Error ? error.message : '観測できませんでした。'); }
   }
 
+  function duplicateNote() {
+    if (!active || notes.length >= MAX_NOTES || duplication?.status === 'running') return;
+    const source = { ...active };
+    const payload = duplicatePayload(source);
+    clearDuplicate(); setMessage('');
+    setDuplication({ status: 'running', source: 'タイトル・本文', completed: 0, total: payload.length * 16 });
+    duplicateJob.current = startTextTransfer(payload, {
+      createWorker: () => new TeleportWorker(),
+      receive: output => {
+        const latest = currentNotebook.current;
+        const original = latest.notes.find(note => note.id === source.id);
+        if (latest.activeId !== source.id || !original || original.title !== source.title || original.body !== source.body) return false;
+        const copy = receivedDuplicate(output, crypto.randomUUID(), new Date().toISOString());
+        const next = addDuplicate(latest.notes, source.id, copy);
+        if (!next) return false;
+        setNotes(next); setActiveId(copy.id); setOpenedId(copy.id);
+        setFilter(''); setMeasurementStep(null);
+        return true;
+      },
+      onProgress: completed => setDuplication({ status: 'running', source: 'タイトル・本文', completed, total: payload.length * 16 }),
+      onDone: result => { duplicateJob.current = null; setDuplication({ status: 'done', source: 'タイトル・本文', result }); },
+      onCancelled: () => { duplicateJob.current = null; setDuplication({ status: 'cancelled', source: 'タイトル・本文' }); },
+      onError: () => { duplicateJob.current = null; setDuplication({ status: 'error', source: 'タイトル・本文' }); },
+    });
+  }
+
   return <div className="notepad">
     <a className="skip-link" href="#note-editor">本文へ移動</a>
     <aside className="sidebar" aria-label="メモ一覧">
@@ -96,8 +143,9 @@ export function App() {
       {saveError && <p role="alert" className="notice error">{saveError}</p>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       {active && trace ? <>
-        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
-        <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} onChange={editNote} onHide={() => { setOpenedId(null); setMessage(''); }} />
+        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? 'メモは最大16件です。' : undefined}>複製</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
+        <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
+        {duplication && <TeleportationPanel activity={duplication} operation="duplicate" />}
         <p className="observation-message" role="status">{message}</p>
         <QuantumPanel trace={trace} notes={notes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
       </> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { insertReceived, pastePayload, startQuantumPaste, type PastePosition } from './quantumPaste';
+import { insertReceived, pastePayload, type PastePosition } from './quantumPaste';
+import { startTextTransfer } from './quantum/transfer';
 import { teleportText, type TransferMessage } from './quantum/teleportation';
 
 const position: PastePosition = { value: 'leftRIGHTend', start: 4, end: 9, maxLength: 200000, multiline: true };
@@ -9,7 +10,7 @@ function setup(valid = true) {
   let value = position.value;
   const insert = vi.fn((output: string) => { if (!valid) return false; value = insertReceived(position, output); return true; });
   const done = vi.fn(), error = vi.fn(), cancelled = vi.fn(), progress = vi.fn();
-  const job = startQuantumPaste('clipboard input', { createWorker: () => worker as unknown as Worker, insert, onDone: done, onError: error, onCancelled: cancelled, onProgress: progress });
+  const job = startTextTransfer('clipboard input', { createWorker: () => worker as unknown as Worker, receive: insert, onDone: done, onError: error, onCancelled: cancelled, onProgress: progress });
   const emit = (message: TransferMessage) => worker.onmessage?.({ data: message } as MessageEvent<TransferMessage>);
   const finish = () => {
     const { output, ...result } = teleportText('受信', () => 0.9);

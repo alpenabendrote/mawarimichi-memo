@@ -22,4 +22,13 @@ describe('paste diagnostics', () => {
     expect(html).toContain('貼り付け失敗');
     expect(html).not.toContain('貼り付け完了');
   });
+  it('shows whole-note duplication results in a single closed disclosure', () => {
+    const { output, ...result } = teleportText('["題名","本文"]', () => 0.9);
+    const html = renderToStaticMarkup(<TeleportationPanel operation="duplicate" activity={{ status: 'done', source: 'タイトル・本文', result: { ...result, matches: output === '["題名","本文"]' } }} />);
+    expect(html).toContain('複製の詳細');
+    expect(html).toContain('複製完了');
+    expect(html).toContain('新しいメモを追加');
+    expect(html.match(/<details/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<details[^>]+open/);
+  });
 });

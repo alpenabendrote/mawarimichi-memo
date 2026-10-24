@@ -38,4 +38,4 @@ export function loadNotes(storage: Pick<Storage, 'getItem'>): { notes: Note[]; e
   }
 }
 
-export function noteTitle(note: Note): string { return note.title.trim() || '無題のメモ'; }
+export function noteTitle(note: Pick<Note, 'title'>): string { return note.title.trim() || '無題のメモ'; }
