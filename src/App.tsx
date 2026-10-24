@@ -9,6 +9,7 @@ import { startTextTransfer, type TransferActivity } from './quantum/transfer';
 import TeleportWorker from './quantum/teleport.worker?worker&inline';
 import { TeleportationPanel } from './TeleportationPanel';
 import { SimilarNotes } from './SimilarNotes';
+import { HelpDialog } from './HelpDialog';
 
 function initialNotebook() {
   try { return loadNotes(window.localStorage); }
@@ -25,6 +26,7 @@ export function App() {
   const [message, setMessage] = useState('');
   const [measurementStep, setMeasurementStep] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<{ note: Note; index: number } | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [duplication, setDuplication] = useState<TransferActivity | null>(null);
   const [duplicateDetailsOpen, setDuplicateDetailsOpen] = useState(false);
   const duplicateJob = useRef<{ cancel: () => void } | null>(null);
@@ -139,7 +141,7 @@ export function App() {
       <header className="list-header"><h1>メモ帳</h1><button onClick={newNote} disabled={notes.length >= MAX_NOTES}>新規</button></header>
       <input className="filter" aria-label="タイトルを絞り込む" placeholder="タイトルを絞り込む" value={filter} onChange={event => setFilter(event.target.value)} />
       <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(note => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}>{noteTitle(note)}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
-      <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={exportNotes}>JSONを書き出す</button></footer>
+      <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes}>JSONを書き出す</button></footer>
     </aside>
     <main className="main">
       {saveError && <p role="alert" className="notice error">{saveError}</p>}
@@ -153,5 +155,6 @@ export function App() {
         <QuantumPanel trace={trace} notes={notes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
       </> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
     </main>
+    {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
   </div>;
 }

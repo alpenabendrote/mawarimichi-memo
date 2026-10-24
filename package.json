@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/export-help.mjs && tsc --noEmit && vite build",
+    "help:export": "node scripts/export-help.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run"
   },

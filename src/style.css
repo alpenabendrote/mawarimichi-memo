@@ -15,6 +15,7 @@ button:disabled { color: #aaa; cursor: default; }
 .note-list button { display: block; width: 100%; border: 0; background: transparent; text-align: left; padding: 9px 8px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 0; }
 .note-list button.selected { background: #eee; }
 .list-footer { border-top: 1px solid #eee; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #777; }
+.list-footer > * { white-space: nowrap; }
 .link-button { background: none; border: 0; padding: 0; text-decoration: underline; font-size: 12px; color: #666; }
 .main { min-width: 0; padding: 20px 32px; display: flex; flex-direction: column; }
 .note-toolbar { position: sticky; top: 0; z-index: 3; background: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; padding: 10px 0; border-bottom: 1px solid #eee; }
