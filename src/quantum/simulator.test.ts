@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyGate, createCircuit, measure, measureSearchAt, optimalIterations, prepareSearch, probabilities, runSearch, zeroState, type Gate } from './simulator';
+import { applyGate, createCircuit, measure, measureSearchAt, optimalIterations, prepareSearch, probabilities, runSearch, zeroState, MAX_NOTES, type Gate } from './simulator';
 
 const gate = (kind: Gate['kind'], target: number, controls: number[] = []): Gate => ({ kind, target, controls, stage: 'prepare', iteration: 0 });
 
@@ -51,7 +51,7 @@ describe('Grover circuit', () => {
     expect(prepared.measured).toBeNull();
     expect(() => measureSearchAt(prepared, prepared.snapshots.length)).toThrow();
   });
-  it('matches the independent analytical success probability for every supported count and target', () => {
+  it('matches the independent analytical success probability for every count and target up to 16', () => {
     for (let count = 1; count <= 16; count++) {
       for (let target = 0; target < count; target++) {
         const run = runSearch(count, target, () => 0.37);
@@ -63,6 +63,19 @@ describe('Grover circuit', () => {
         }
       }
     }
+  });
+  it('searches every larger notebook size up to 128 with the correct analytical probability and normalized trace', () => {
+    for (let count = 17; count <= MAX_NOTES; count++) for (const target of [0, Math.floor(count / 2), count - 1]) {
+      const run = prepareSearch(count, target);
+      expect(run.qubits).toBe(Math.ceil(Math.log2(count)));
+      const expected = Math.sin((2 * run.iterations + 1) * Math.asin(1 / Math.sqrt(run.dimension))) ** 2;
+      expect(run.probabilities[target]).toBeCloseTo(expected, 11);
+      for (const snapshot of run.snapshots) expect(snapshot.state.reduce((sum, v) => sum + v * v, 0)).toBeCloseTo(1, 10);
+      const measured = measureSearchAt(run, run.snapshots.length - 1, () => 0.5);
+      expect(probabilities(measured.snapshots.at(-1)!.state).filter(p => p > 1e-10)).toHaveLength(1);
+    }
+    expect(zeroState(7)).toHaveLength(256);
+    expect(() => zeroState(8)).toThrow();
   });
   it('finds each of four targets with certainty after one amplification', () => {
     for (let target = 0; target < 4; target++) {
@@ -97,7 +110,7 @@ describe('Grover circuit', () => {
     expect(run.probabilities).toEqual([1]);
     expect(optimalIterations(16)).toBe(3);
     expect(() => createCircuit(0, 0)).toThrow();
-    expect(() => createCircuit(17, 0)).toThrow();
+    expect(() => createCircuit(MAX_NOTES + 1, 0)).toThrow();
     expect(() => createCircuit(4, 4)).toThrow();
   });
 });

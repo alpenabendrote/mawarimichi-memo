@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { startSimilarityComparison } from './similarityJob';
 import type { SimilarityMessage, SimilarityResult } from './similarity';
 
-const result: SimilarityResult = { activeId: 'a', candidates: [], featureCount: 0, omittedFeatures: 0, sourcePreparationGates: 0, elapsed: 1 };
+const result: SimilarityResult = { activeId: 'a', candidates: [], featureDimension: 64, featureCount: 0, omittedFeatures: 0, sourcePreparationGates: 0, elapsed: 1 };
 function setup() {
   const worker = { onmessage: null as ((event: MessageEvent<SimilarityMessage>) => void) | null, onerror: null as (() => void) | null, postMessage: vi.fn(), terminate: vi.fn() };
   const done = vi.fn(), error = vi.fn(), progress = vi.fn();

@@ -1,8 +1,9 @@
 import { bufferedRandom } from './quantum/teleportation';
 import { prepareAmplitudes, prepareSwapTest, sampleSwapTest } from './quantum/swap';
+import { MAX_NOTES } from './quantum/simulator';
 
 export interface SimilarityNote { id: string; title: string; body: string }
-export const FEATURE_DIMENSION = 64;
+const MIN_FEATURE_DIMENSION = 64;
 export const SIMILARITY_SHOTS = 4096;
 export const MIN_SIMILARITY = 0.1;
 
@@ -21,6 +22,7 @@ export function characterFeatures(note: Pick<SimilarityNote, 'title' | 'body'>):
 
 /** A shared, deterministic TF-IDF vocabulary; no hash collisions or pair-specific bases. */
 export function encodeNotebook(notes: readonly SimilarityNote[]) {
+  const dimension = Math.max(MIN_FEATURE_DIMENSION, 2 ** Math.ceil(Math.log2(Math.max(1, notes.length))));
   const documents = notes.map(characterFeatures);
   const frequency = new Map<string, number>();
   for (const document of documents) for (const token of document.keys()) frequency.set(token, (frequency.get(token) ?? 0) + 1);
@@ -37,20 +39,21 @@ export function encodeNotebook(notes: readonly SimilarityNote[]) {
   });
   const lexical = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
   const selected = new Set<string>();
-  // Reserve a few features per document so one long note cannot lose its entire state.
+  // Reserve at least one feature per document, even at the notebook's full capacity.
+  const perNote = Math.min(4, Math.floor(dimension / Math.max(1, notes.length)));
   for (const document of weighted) {
     const local = [...document.keys()].sort((a, b) => document.get(b)! - document.get(a)! || lexical(a, b));
-    for (const token of local.slice(0, 4)) selected.add(token);
+    for (const token of local.slice(0, perNote)) selected.add(token);
   }
   const ordered = [...importance.keys()].sort((a, b) => importance.get(b)! - importance.get(a)! || lexical(a, b));
-  for (const token of ordered) { if (selected.size >= FEATURE_DIMENSION) break; selected.add(token); }
-  const vocabulary = [...selected].sort(lexical).slice(0, FEATURE_DIMENSION);
+  for (const token of ordered) { if (selected.size >= dimension) break; selected.add(token); }
+  const vocabulary = [...selected].sort(lexical);
   const vectors = weighted.map(values => {
-    const vector = Array.from({ length: FEATURE_DIMENSION }, (_, i) => values.get(vocabulary[i]) ?? 0);
+    const vector = Array.from({ length: dimension }, (_, i) => values.get(vocabulary[i]) ?? 0);
     const norm = Math.hypot(...vector);
     return norm ? vector.map(value => value / norm) : null;
   });
-  return { vectors, featureCount: vocabulary.length, omittedFeatures: Math.max(0, frequency.size - vocabulary.length) };
+  return { vectors, dimension, featureCount: vocabulary.length, omittedFeatures: Math.max(0, frequency.size - vocabulary.length) };
 }
 
 export interface SimilarityCandidate {
@@ -67,6 +70,7 @@ export interface SimilarityResult {
   featureCount: number;
   omittedFeatures: number;
   sourcePreparationGates: number;
+  featureDimension: number;
   elapsed: number;
 }
 export interface SimilarityRequest { notes: SimilarityNote[]; activeId: string }
@@ -76,9 +80,9 @@ export function compareNotes(request: SimilarityRequest, random = bufferedRandom
   const start = performance.now();
   const { notes, activeId } = request;
   const index = notes.findIndex(note => note.id === activeId);
-  if (index < 0 || notes.length > 16 || new Set(notes.map(note => note.id)).size !== notes.length) throw new Error('比較するメモが不正です。');
+  if (index < 0 || notes.length > MAX_NOTES || new Set(notes.map(note => note.id)).size !== notes.length) throw new Error('比較するメモが不正です。');
   const encoded = encodeNotebook(notes);
-  const result: SimilarityResult = { activeId, candidates: [], featureCount: encoded.featureCount, omittedFeatures: encoded.omittedFeatures, sourcePreparationGates: 0, elapsed: 0 };
+  const result: SimilarityResult = { activeId, candidates: [], featureDimension: encoded.dimension, featureCount: encoded.featureCount, omittedFeatures: encoded.omittedFeatures, sourcePreparationGates: 0, elapsed: 0 };
   const vector = encoded.vectors[index];
   if (vector) {
     const source = prepareAmplitudes(vector);

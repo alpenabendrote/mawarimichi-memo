@@ -17,7 +17,7 @@ export interface PreparedWalk {
 export interface WalkRun extends PreparedWalk { measured: number; elapsed: number }
 
 function validate(count: number, source = 0) {
-  if (!Number.isInteger(count) || count < 2 || count > MAX_NOTES || !Number.isInteger(source) || source < 0 || source >= count) throw new Error('おまかせには2〜16件のメモと有効な出発点が必要です。');
+  if (!Number.isInteger(count) || count < 2 || count > MAX_NOTES || !Number.isInteger(source) || source < 0 || source >= count) throw new Error(`おまかせには2〜${MAX_NOTES}件のメモと有効な出発点が必要です。`);
 }
 
 /** q0 is the coin; the remaining qubits encode position. Unused positions are fixed points. */

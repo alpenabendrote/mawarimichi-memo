@@ -5,6 +5,7 @@ import { starterNotes } from './notes';
 import { teleportText, type TransferMessage } from './quantum/teleportation';
 import { startTextTransfer } from './quantum/transfer';
 import { App } from './App';
+import { MAX_NOTES } from './quantum/simulator';
 
 afterEach(() => vi.unstubAllGlobals());
 const timestamp = '2026-10-24T00:00:00.000Z';
@@ -54,12 +55,13 @@ describe('whole-note duplication', () => {
     expect(notes).toHaveLength(4);
   });
   it('never exceeds capacity or replaces a removed or existing ID', () => {
-    const notes = Array.from({ length: 16 }, (_, i) => ({ ...starterNotes()[0], id: `note-${i}` }));
+    const notes = Array.from({ length: MAX_NOTES }, (_, i) => ({ ...starterNotes()[0], id: `note-${i}` }));
     const copy = receivedDuplicate(duplicatePayload(notes[0]), 'new-id', timestamp);
+    expect(addDuplicate(notes.slice(0, -1), notes[0].id, copy)).toHaveLength(128);
     expect(addDuplicate(notes, notes[0].id, copy)).toBeNull();
     expect(addDuplicate(notes.slice(0, 4), 'removed-id', copy)).toBeNull();
     expect(addDuplicate(notes.slice(0, 4), notes[0].id, { ...copy, id: notes[1].id })).toBeNull();
-    expect(notes).toHaveLength(16);
+    expect(notes).toHaveLength(128);
     vi.stubGlobal('window', { localStorage: { getItem: () => JSON.stringify(notes) } });
     const html = renderToStaticMarkup(<App />);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>複製<\/button>/);

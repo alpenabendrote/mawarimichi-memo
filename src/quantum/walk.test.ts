@@ -92,7 +92,23 @@ describe('coherent two-part quantum walk', () => {
     expect(runWalk(2, 1, () => 0).measured).toBe(0);
   });
   it('rejects invalid inputs without pretending that a walk or measurement succeeded', () => {
-    for (const [count, source] of [[0, 0], [1, 0], [17, 0], [4, -1], [4, 4], [3.5, 0]]) expect(() => prepareWalk(count, source)).toThrow();
+    for (const [count, source] of [[0, 0], [1, 0], [129, 0], [4, -1], [4, 4], [3.5, 0]]) expect(() => prepareWalk(count, source)).toThrow();
     for (const draw of [-1, 1, Number.NaN]) expect(() => measureWalk(prepareWalk(4, 0), () => draw)).toThrow();
+  });
+  it('preserves coherent traces and measures other notes at larger capacities and binary boundaries', () => {
+    for (const count of [17, 31, 32, 33, 63, 64, 65, 127, 128]) for (const source of [0, Math.floor(count / 2), count - 1]) {
+      const prepared = prepareWalk(count, source);
+      expect(prepared.positionQubits + 1).toBe(Math.ceil(Math.log2(count)) + 1);
+      for (const snapshot of prepared.snapshots) {
+        expect(snapshot.state.reduce((sum, v) => sum + v * v, 0)).toBeCloseTo(1, 10);
+        expect(snapshot.state.slice(4 * count).every(v => v === 0)).toBe(true);
+      }
+      for (const draw of [0, 0.5, 1 - Number.EPSILON]) {
+        const result = measureWalk(prepared, () => draw);
+        expect(result.measured).not.toBe(source);
+        expect(result.measured).toBeGreaterThanOrEqual(0);
+        expect(result.measured).toBeLessThan(count);
+      }
+    }
   });
 });

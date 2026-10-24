@@ -26,11 +26,12 @@ export interface SearchRun {
   measured: number;
 }
 export type PreparedSearch = Omit<SearchRun, 'measured'> & { measured: null };
-export const MAX_NOTES = 16;
+export const MAX_NOTES = 128;
+const MAX_SEARCH_QUBITS = Math.ceil(Math.log2(MAX_NOTES));
 
 export function zeroState(qubits: number): StateVector {
-  if (!Number.isInteger(qubits) || qubits < 0 || qubits > 4) {
-    throw new Error('量子ビット数は0〜4です。');
+  if (!Number.isInteger(qubits) || qubits < 0 || qubits > MAX_SEARCH_QUBITS) {
+    throw new Error(`量子ビット数は0〜${MAX_SEARCH_QUBITS}です。`);
   }
   const state = new Float64Array(2 * 2 ** qubits);
   state[0] = 1;
@@ -120,7 +121,7 @@ export function optimalIterations(dimension: number): number {
 
 /** An oracle marks a known ID. No classical search result is substituted. */
 export function createCircuit(count: number, target: number): { qubits: number; iterations: number; gates: Gate[] } {
-  if (!Number.isInteger(count) || count < 1 || count > MAX_NOTES) throw new Error('メモは1〜16件です。');
+  if (!Number.isInteger(count) || count < 1 || count > MAX_NOTES) throw new Error(`メモは1〜${MAX_NOTES}件です。`);
   if (!Number.isInteger(target) || target < 0 || target >= count) throw new Error('検索対象が不正です。');
   const qubits = Math.ceil(Math.log2(count));
   const iterations = optimalIterations(2 ** qubits);

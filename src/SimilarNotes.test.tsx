@@ -16,4 +16,13 @@ describe('similarity diagnostics', () => {
     expect(html).toContain('4,096'); expect(html).toContain('13量子ビット');
     for (const note of notes) expect(html).not.toContain(note.body);
   });
+  it('shows the actual 15-qubit circuit when the notebook uses 128 features', () => {
+    const notes = Array.from({ length: 65 }, (_, i) => ({ ...starterNotes()[0], id: String(i), body: String.fromCodePoint(0x4e00 + i) }));
+    const result = compareNotes({ notes, activeId: '0' }, () => 0.1);
+    const html = renderToStaticMarkup(<SimilarityDetails result={result} notes={notes} />);
+    expect(html).toContain('15量子ビット');
+    expect(html).toContain('7組の制御SWAP');
+    expect(html).toContain('最大128特徴');
+    expect(html).not.toContain('13量子ビット');
+  });
 });

@@ -6,7 +6,7 @@ export interface PreparationRotation { target: number; controls: number[]; patte
 export function prepareAmplitudes(vector: readonly number[]): { state: StateVector; rotations: PreparationRotation[] } {
   const qubits = Math.log2(vector.length);
   const norm = vector.reduce((sum, value) => sum + value * value, 0);
-  if (!Number.isInteger(qubits) || qubits < 1 || qubits > 6 || vector.some(v => !Number.isFinite(v) || v < 0) || Math.abs(norm - 1) > 1e-10) throw new Error('特徴ベクトルを規格化してください。');
+  if (!Number.isInteger(qubits) || qubits < 1 || qubits > 7 || vector.some(v => !Number.isFinite(v) || v < 0) || Math.abs(norm - 1) > 1e-10) throw new Error('特徴ベクトルを規格化してください。');
   let state: StateVector = new Float64Array(vector.length * 2);
   state[0] = 1;
   const rotations: PreparationRotation[] = [];
@@ -37,7 +37,7 @@ export function prepareAmplitudes(vector: readonly number[]): { state: StateVect
 function validateState(state: StateVector) {
   const dimension = state.length / 2;
   const norm = state.reduce((sum, value) => sum + value * value, 0);
-  if (!Number.isInteger(Math.log2(dimension)) || dimension < 2 || dimension > 64 || !Number.isFinite(norm) || Math.abs(norm - 1) > 1e-10) throw new Error('入力状態が不正です。');
+  if (!Number.isInteger(Math.log2(dimension)) || dimension < 2 || dimension > 128 || !Number.isFinite(norm) || Math.abs(norm - 1) > 1e-10) throw new Error('入力状態が不正です。');
 }
 
 /** Fredkin gate: control q0, swap the corresponding qubits of registers A and B. */

@@ -11,7 +11,7 @@ function innerProductSquared(a: StateVector, b: StateVector) {
 
 describe('actual SWAP circuit', () => {
   it('prepares sparse and dense vectors using controlled Ry, including zero branches', () => {
-    for (const weights of [[0, 1], [0, 0, 1, 0], [1, 2, 3, 4], Array.from({ length: 64 }, (_, i) => i % 7 ? i : 0)]) {
+    for (const weights of [[0, 1], [0, 0, 1, 0], [1, 2, 3, 4], Array.from({ length: 64 }, (_, i) => i % 7 ? i : 0), Array.from({ length: 128 }, (_, i) => i % 11 ? i : 0)]) {
       const vector = weights.map(value => value / Math.hypot(...weights));
       const prepared = prepareAmplitudes(vector);
       vector.forEach((value, i) => { expect(prepared.state[2 * i]).toBeCloseTo(value, 12); expect(prepared.state[2 * i + 1]).toBe(0); });
@@ -40,7 +40,7 @@ describe('actual SWAP circuit', () => {
       [complex([[s, 0], [0, s]]), complex([[s, 0], [0, -s]])],
       [complex([[s, 0], [0, s]]), complex([[0, s], [-s, 0]])], // global phase, same state
     ];
-    for (const dimension of [2, 4, 8, 16, 32, 64]) {
+    for (const dimension of [2, 4, 8, 16, 32, 64, 128]) {
       const a = new Float64Array(2 * dimension), b = new Float64Array(2 * dimension);
       for (let i = 0; i < a.length; i++) { a[i] = Math.sin(i + 0.3); b[i] = Math.cos(2 * i + 0.7); }
       const an = Math.hypot(...a), bn = Math.hypot(...b);
