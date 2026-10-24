@@ -26,6 +26,7 @@ export function App() {
   const [measurementStep, setMeasurementStep] = useState<number | null>(null);
   const [deleted, setDeleted] = useState<{ note: Note; index: number } | null>(null);
   const [duplication, setDuplication] = useState<TransferActivity | null>(null);
+  const [duplicateDetailsOpen, setDuplicateDetailsOpen] = useState(false);
   const duplicateJob = useRef<{ cancel: () => void } | null>(null);
   const currentNotebook = useRef({ notes, activeId });
   currentNotebook.current = { notes, activeId };
@@ -146,7 +147,7 @@ export function App() {
       {active && trace ? <>
         <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? 'メモは最大16件です。' : undefined}>複製</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
         <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
-        {duplication && <TeleportationPanel activity={duplication} operation="duplicate" />}
+        <TeleportationPanel activity={duplication} operation="duplicate" open={duplicateDetailsOpen} onOpenChange={setDuplicateDetailsOpen} />
         <SimilarNotes notes={notes} activeId={active.id} onSelect={selectNote} />
         <p className="observation-message" role="status">{message}</p>
         <QuantumPanel trace={trace} notes={notes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
