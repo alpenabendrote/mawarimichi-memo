@@ -2,14 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { basisLabel, describeGate, probabilities, stageNames, type PreparedSearch } from './quantum/simulator';
 
 function Circuit({ trace, step }: { trace: PreparedSearch; step: number }) {
-  const markerRef = useRef<SVGGElement | null>(null);
-  useEffect(() => { markerRef.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' }); }, [step]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    // Keep the measurement marker visible without scrolling the whole page.
+    const markerX = 48 + (step - 0.5) * 34;
+    container.scrollTo({ left: Math.max(0, markerX - container.clientWidth / 2), behavior: 'instant' });
+  }, [step]);
   if (trace.qubits === 0) return <p className="muted">メモが1件のため、量子ビットは不要です。</p>;
   const gates = trace.gates.slice(0, -1);
   const left = 48, cell = 34, row = 35, top = 40;
   const width = left + (gates.length + 1) * cell;
   const markerX = left + (step - 0.5) * cell;
-  return <div className="circuit-scroll" tabIndex={0} aria-label="量子回路。横にスクロールできます。">
+  return <div ref={scrollRef} className="circuit-scroll" tabIndex={0} aria-label="量子回路。横にスクロールできます。">
     <svg width={width} height={top + trace.qubits * row + 5} role="img" aria-label={`${trace.qubits}量子ビットの回路。縦線Mの位置で測定します。`}>
       {Array.from({ length: trace.qubits }, (_, q) => <g key={q}><text x="4" y={top + q * row + 4}>q{q}</text><line className="wire" x1="28" x2={width - 8} y1={top + q * row} y2={top + q * row} /></g>)}
       {gates.map((gate, i) => {
@@ -21,7 +27,7 @@ function Circuit({ trace, step }: { trace: PreparedSearch; step: number }) {
           <rect x={x - 11} y={y - 11} width="22" height="22" /><text x={x} y={y + 4} textAnchor="middle">{gate.kind === 'MCX' ? 'X' : gate.kind}</text>
         </g>;
       })}
-      <g ref={markerRef} className="measurement-marker"><line x1={markerX} x2={markerX} y1="22" y2={top + (trace.qubits - 1) * row + 15} /><text x={markerX} y="13" textAnchor="middle">M</text></g>
+      <g className="measurement-marker"><line x1={markerX} x2={markerX} y1="22" y2={top + (trace.qubits - 1) * row + 15} /><text x={markerX} y="13" textAnchor="middle">M</text></g>
     </svg>
   </div>;
 }

@@ -17,20 +17,21 @@ button:disabled { color: #aaa; cursor: default; }
 .list-footer { border-top: 1px solid #eee; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #777; }
 .link-button { background: none; border: 0; padding: 0; text-decoration: underline; font-size: 12px; color: #666; }
 .main { min-width: 0; padding: 20px 32px; display: flex; flex-direction: column; }
-.note-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 15px; }
+.note-toolbar { position: sticky; top: 0; z-index: 3; background: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; padding: 10px 0; border-bottom: 1px solid #eee; }
 .note-toolbar > div { display: flex; gap: 8px; }
 .note-toolbar .muted { font-size: 11px; }
 .observe-button { border-color: #777; }
-.editor { display: flex; flex-direction: column; min-height: 420px; flex: 1; }
+.editor { display: flex; flex-direction: column; }
 .note-title { background: transparent; border: 0; border-bottom: 1px solid #eee; border-radius: 0; padding: 9px 0 12px; width: 100%; font-size: 20px; font-weight: 500; }
-.note-body { flex: 1; width: 100%; resize: vertical; border: 0; padding: 20px 0; min-height: 330px; line-height: 1.9; font-size: 14px; background: transparent; }
+.note-body { width: 100%; resize: vertical; border: 0; padding: 12px 0; min-height: 128px; max-height: 360px; overflow-y: auto; line-height: 1.9; font-size: 14px; background: transparent; }
 .note-body:focus-visible { outline-offset: 5px; }
 .editor-footer { display: flex; justify-content: space-between; gap: 15px; padding: 12px 0; font-size: 11px; color: #777; }
-.hidden-body { flex: 1; padding-top: 25px; color: #777; }
+.hidden-body { padding: 14px 0; color: #777; }
 .hidden-body p { margin: 5px 0; font-size: 13px; }
 .muted { color: #777; }
 .hidden-body .muted { font-size: 12px; }
 .observation-message { font-size: 12px; color: #666; min-height: 20px; margin: 12px 0; overflow-wrap: anywhere; }
+.observation-message:empty { display: none; }
 .notice { background: #f5f5f5; padding: 9px 12px; font-size: 12px; margin: 0 0 15px; display: flex; align-items: center; gap: 12px; }
 .notice.error { color: #8b352c; }
 .dismiss { margin-left: auto; border: 0; background: transparent; padding: 0 4px; }
@@ -74,8 +75,6 @@ code { font: 11px ui-monospace, Consolas, monospace; }
   .note-list button { padding: 6px 8px; }
   .list-footer { padding-top: 7px; }
   .main { padding: 16px; }
-  .editor { min-height: 300px; }
-  .note-body { min-height: 250px; }
   .note-title { font-size: 18px; }
   .measurement-position { gap: 8px; }
 }
