@@ -57,6 +57,12 @@ button:disabled { color: #aaa; cursor: default; }
 .measurement-marker text { fill: #222; }
 .classical-wire { fill: none; stroke: #777; stroke-dasharray: 4 3; }
 .transfer-details { margin-top: 4px; }
+.similar-notes { margin: 4px 0 0; }
+.similar-note-line { font-size: 12px; color: #777; margin: 6px 0 10px; overflow-wrap: anywhere; }
+.similar-note-line .link-button { color: #444; overflow-wrap: anywhere; }
+.similarity-details { border-top: 0; }
+.similarity-details > summary { padding: 0 0 12px; font-size: 11px; }
+.swap-cross { fill: none; stroke: #777; stroke-width: 1.3; }
 .bit-position { display: flex; gap: 8px; align-items: center; font-size: 12px; }
 .bit-position input { width: 95px; padding: 3px 5px; border: 1px solid #ccc; background: white; }
 .state-table-wrap { overflow-x: auto; }
