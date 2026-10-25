@@ -106,4 +106,21 @@ public class OfflineNotebookTest {
             assertEquals("true", evaluate("!document.querySelector('textarea')"));
         } finally { scenario.close(); }
     }
+
+    @Test public void longSedimentBodyKeepsAllTextAndCountsCharactersOffline() throws Exception {
+        org.json.JSONObject note = new org.json.JSONObject();
+        note.put("id", "long-archive"); note.put("title", "堆積");
+        note.put("body", new String(new char[210000]).replace('\0', '長') + "🪐");
+        note.put("updatedAt", java.time.Instant.now().toString());
+        note.put("sediment", new org.json.JSONObject().put("total", 1).put("history", new org.json.JSONArray()));
+        InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0).edit().clear().putString("quantum-notepad.notes.v1", new org.json.JSONArray().put(note).toString()).commit();
+        scenario = ActivityScenario.launch(MainActivity.class);
+        try {
+            eventually("document.querySelector('.note-title')?.value === '堆積'");
+            evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='量子検索').click()");
+            eventually("document.querySelector('textarea')?.value.length === 210002");
+            assertEquals("true", evaluate("document.querySelector('textarea').maxLength === -1"));
+            assertEquals("true", evaluate("document.querySelector('.editor-footer')?.textContent.includes((210001).toLocaleString())"));
+        } finally { scenario.close(); }
+    }
 }
