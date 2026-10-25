@@ -17,6 +17,9 @@ import { newZenoMemory } from './quantum/zeno';
 import { ZenoPanel } from './ZenoPanel';
 import { saveNotebook, type LoadedNotebook } from './notebookStorage';
 import { exportNotebook, mergeNotebookBackup } from './notebookBackup';
+import { CoolingPanel } from './CoolingPanel';
+import { coolingPayload, removeCooledNote, startCoolingDeletion, type CoolingActivity } from './coolingDeletion';
+import CoolingWorker from './quantum/cooling.worker?worker&inline';
 
 function initialNotebook(provided?: LoadedNotebook) {
   if (provided) return { ...provided, notes: initializeZenoNotes(provided.notes, Date.now()) };
@@ -52,6 +55,9 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   const [duplication, setDuplication] = useState<TransferActivity | null>(null);
   const [duplicateDetailsOpen, setDuplicateDetailsOpen] = useState(false);
   const duplicateJob = useRef<{ cancel: () => void } | null>(null);
+  const coolingJob = useRef<{ cancel: () => void } | null>(null);
+  const [cooling, setCooling] = useState<CoolingActivity | null>(null);
+  const [coolingDetailsOpen, setCoolingDetailsOpen] = useState(false);
   const currentNotebook = useRef({ notes, activeId });
   currentNotebook.current = { notes, activeId };
   const titleRef = useRef<HTMLInputElement>(null);
@@ -62,7 +68,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   const trace = useMemo(() => target < 0 ? null : prepareSearch(notes.length, target), [notes.length, target]);
   const visibleNotes = display.filter(({ note }) => noteTitle(note).toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
 
-  useEffect(() => () => { duplicateJob.current?.cancel(); }, []);
+  useEffect(() => () => { duplicateJob.current?.cancel(); coolingJob.current?.cancel(); }, []);
 
   useEffect(() => {
     if (!initial.writable) return;
@@ -73,7 +79,13 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
     return () => { current = false; };
   }, [notes, initial.writable, persist]);
 
+  function cancelCooling() {
+    if (!coolingJob.current) return;
+    coolingJob.current.cancel(); coolingJob.current = null;
+    setCooling(previous => previous ? { title: previous.title, status: 'cancelled' } : null);
+  }
   function clearDuplicate() {
+    cancelCooling();
     duplicateJob.current?.cancel(); duplicateJob.current = null; setDuplication(null);
   }
   function selectNote(id: string) {
@@ -95,6 +107,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   }
   function editNote(field: 'title' | 'body', value: string) {
     if (field === 'body' && openedId !== activeId) return;
+    cancelCooling();
     if (duplicateJob.current) {
       duplicateJob.current.cancel(); duplicateJob.current = null;
       setDuplication({ status: 'cancelled', source: 'タイトル・本文' });
@@ -104,15 +117,30 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
     setListTime(now);
   }
   function deleteNote() {
-    if (!active) return;
-    clearDuplicate();
-    const index = notes.indexOf(active);
-    const remaining = notes.filter(note => note.id !== active.id);
-    const remainingDisplay = orderedNotes.filter(note => note.id !== active.id);
-    setDeleted({ note: active, index }); setNotes(remaining);
-    setActiveId(remainingDisplay[Math.min(orderedNotes.indexOf(active), remainingDisplay.length - 1)]?.id ?? null);
-    setOpenedId(null); setMeasurementStep(null); setMessage('');
-    setListTime(Date.now());
+    if (!active || coolingJob.current || !initial.writable) return;
+    const source = { ...active }, payload = coolingPayload(source), title = noteTitle(source);
+    clearDuplicate(); setMessage('');
+    setCooling({ title, status: 'running', completed: 0, total: payload.length * 16 });
+    coolingJob.current = startCoolingDeletion(payload, {
+      createWorker: () => new CoolingWorker(),
+      commit: () => {
+        const latest = currentNotebook.current;
+        if (latest.activeId !== source.id) return false;
+        const removed = removeCooledNote(latest.notes, source);
+        if (!removed) return false;
+        const now = Date.now(), ordered = orderZenoNotes(latest.notes, now).map(entry => entry.note);
+        const sourceIndex = ordered.findIndex(note => note.id === source.id);
+        const remaining = ordered.filter(note => note.id !== source.id);
+        setDeleted(removed.deleted); setNotes(removed.notes);
+        setActiveId(remaining[Math.min(sourceIndex, remaining.length - 1)]?.id ?? null);
+        setOpenedId(null); setMeasurementStep(null); setListTime(now);
+        return true;
+      },
+      onProgress: completed => setCooling({ title, status: 'running', completed, total: payload.length * 16 }),
+      onDone: result => { coolingJob.current = null; setCooling({ title, status: 'done', result }); },
+      onCancelled: () => { coolingJob.current = null; setCooling({ title, status: 'cancelled' }); },
+      onError: () => { coolingJob.current = null; setCooling({ title, status: 'error' }); setMessage('緩和を確認できなかったため、メモは削除していません。'); },
+    });
   }
   function undoDelete() {
     if (!deleted || notes.length >= MAX_NOTES) return;
@@ -221,26 +249,27 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
     <main className="main">
       {saveError && <p role="alert" className="notice error">{saveError}</p>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
-      {active && trace ? <>
-        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : saving ? '保存中…' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
+      <>
+        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : saving ? '保存中…' : '自動保存'}</span><div>{active && trace && <><button onClick={deleteNote} disabled={cooling?.status === 'running' || !initial.writable} aria-busy={cooling?.status === 'running'}>{cooling?.status === 'running' ? '消去中…' : '削除'}</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></>}</div></header>
         <div className="view-switch" role="group" aria-label="表示する欄">
           <button aria-pressed={view === 'note'} aria-controls="note-pane" onClick={() => setView('note')}>メモ</button>
           <button aria-pressed={view === 'calculation'} aria-controls="calculation-pane" onClick={() => setView('calculation')}>回路・計算</button>
         </div>
         <div className={`workspace view-${view}`}>
           <section id="note-pane" className="note-pane" aria-label="メモ欄" tabIndex={0}>
-            <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} />
+            {active && trace ? <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} /> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
           </section>
           <section id="calculation-pane" className="calculation-pane" aria-label="回路・計算欄" tabIndex={0}>
-            <QuantumPanel trace={trace} notes={orderedNotes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
+            <CoolingPanel activity={cooling} open={coolingDetailsOpen} onOpenChange={setCoolingDetailsOpen} />
+            {active && trace && <><QuantumPanel trace={trace} notes={orderedNotes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
             <ZenoPanel note={active} at={listTime} record={zenoRecord} open={zenoDetailsOpen} onOpenChange={setZenoDetailsOpen} />
             <QuantumWalkPanel record={walkRecord} open={walkDetailsOpen} onOpenChange={setWalkDetailsOpen} />
             <TeleportationPanel activity={duplication} operation="duplicate" open={duplicateDetailsOpen} onOpenChange={setDuplicateDetailsOpen} />
             <div ref={setTransferTarget} />
-            <SimilarNotes notes={orderedNotes} activeId={active.id} onSelect={selectNote} />
+            <SimilarNotes notes={orderedNotes} activeId={active.id} onSelect={selectNote} /></>}
           </section>
         </div>
-      </> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
+      </>
       <p className="observation-message" role="status">{message}</p>
     </main>
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}

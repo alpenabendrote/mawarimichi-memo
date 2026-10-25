@@ -50,6 +50,21 @@ public class OfflineNotebookTest {
             assertTrue("Native storage should contain the reconstructed text", saved.contains("Android 量子貼付"));
             assertTrue(saved.contains("updated after restart"));
             assertFalse(saved.contains("未保存"));
+            // Delete through the real damping worker, retain the open circuit, then restore the exact note.
+            evaluate("document.querySelector('.cooling-details > summary').click()");
+            evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='削除').click()");
+            eventually("document.querySelector('.cooling-details')?.textContent.includes('消去完了')");
+            assertEquals("true", evaluate("document.querySelector('.cooling-details').open"));
+            eventually("!document.querySelector('.note-list')?.textContent.includes('updated after restart')");
+            eventually("document.querySelector('.note-toolbar')?.textContent.includes('自動保存')");
+            String afterDeletion = InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0).getString("quantum-notepad.notes.v1", "");
+            assertFalse(afterDeletion.contains("updated after restart"));
+            evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='元に戻す').click()");
+            eventually("document.querySelector('.note-title')?.value === 'updated after restart'");
+            eventually("document.querySelector('.note-toolbar')?.textContent.includes('自動保存')");
+            String restored = InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0).getString("quantum-notepad.notes.v1", "");
+            assertTrue(restored.contains("Android 量子貼付"));
+            assertTrue(restored.contains("updated after restart"));
         } finally { scenario.close(); }
     }
 }
