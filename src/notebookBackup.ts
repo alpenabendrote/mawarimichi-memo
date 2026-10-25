@@ -1,12 +1,13 @@
 import { Capacitor } from '@capacitor/core';
 import { MAX_NOTES } from './quantum/simulator';
 import { parseNotes, type Note } from './notes';
+import { coalesceSediments } from './sedimentation';
 
 /** Merge backups without overwriting current text, including colliding IDs. */
 export function mergeNotebookBackup(current: Note[], raw: string, newId: () => string = () => crypto.randomUUID()) {
   const incoming = parseNotes(raw), next = [...current];
   const ids = new Set(current.map(note => note.id));
-  let added = 0;
+  let added = 0, firstAddedId: string | undefined;
   for (const note of incoming) {
     const original = current.find(existing => existing.id === note.id);
     if (original && original.title === note.title && original.body === note.body && original.updatedAt === note.updatedAt) continue;
@@ -15,10 +16,14 @@ export function mergeNotebookBackup(current: Note[], raw: string, newId: () => s
       id = newId();
       if (!id || ids.has(id)) throw new Error('読み込み用のIDを作成できませんでした。');
     }
-    ids.add(id); next.push({ ...note, id }); added++;
+    const { sedimentWalk, ...rest } = note;
+    ids.add(id); next.push({ ...rest, id, ...(id === note.id && sedimentWalk ? { sedimentWalk } : {}) }); added++;
+    firstAddedId ??= id;
   }
-  if (next.length > MAX_NOTES) throw new Error('読み込むと128件を超えます。メモを整理してから読み込んでください。');
-  return { notes: next, added };
+  const merged = coalesceSediments(next);
+  if (firstAddedId && !merged.some(note => note.id === firstAddedId)) firstAddedId = merged.find(note => note.sediment)?.id;
+  if (merged.length > MAX_NOTES) throw new Error('読み込むと128件を超えます。メモを整理してから読み込んでください。');
+  return { notes: merged, added, firstAddedId };
 }
 
 export async function exportNotebook(notes: Note[]): Promise<void> {

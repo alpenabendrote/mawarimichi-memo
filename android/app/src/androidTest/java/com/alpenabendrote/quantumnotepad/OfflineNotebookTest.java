@@ -67,4 +67,39 @@ public class OfflineNotebookTest {
             assertTrue(restored.contains("updated after restart"));
         } finally { scenario.close(); }
     }
+
+    @Test public void offlineSedimentWorkerSavesSurvivingStatesAndRestoresOnRecreation() throws Exception {
+        org.json.JSONArray notes = new org.json.JSONArray();
+        for (int i = 0; i < 32; i++) {
+            org.json.JSONObject note = new org.json.JSONObject();
+            note.put("id", "sediment-" + i);
+            note.put("title", i == 0 ? "保護しているメモ" : "古いメモ " + i);
+            note.put("body", "元の本文🪐 [" + i + "]");
+            note.put("updatedAt", i == 0 ? java.time.Instant.now().toString() : "2020-01-01T00:00:00.000Z");
+            notes.put(note);
+        }
+        android.content.SharedPreferences prefs = InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0);
+        prefs.edit().clear().putString("quantum-notepad.notes.v1", notes.toString()).commit();
+        scenario = ActivityScenario.launch(MainActivity.class);
+        try {
+            eventually("document.querySelector('.sediment-status')?.textContent.includes('回測定')");
+            assertEquals("true", evaluate("document.querySelector('.note-title')?.value === '保護しているメモ'"));
+            String raw = "";
+            long deadline = System.currentTimeMillis() + 10000;
+            do {
+                raw = prefs.getString("quantum-notepad.notes.v1", "");
+                if (raw.contains("\"sedimentWalk\"") || raw.contains("\"sediment\"")) break;
+                Thread.sleep(100);
+            } while (System.currentTimeMillis() < deadline);
+            org.json.JSONArray saved = new org.json.JSONArray(raw);
+            assertTrue(saved.length() <= 32);
+            String all = saved.toString();
+            // Every original body is still in its source note or in the combined archive.
+            for (int i = 0; i < 32; i++) assertTrue("Missing original body " + i, all.contains("元の本文🪐 [" + i + "]"));
+            assertTrue(all.contains("\"sedimentWalk\"") || all.contains("\"sediment\""));
+            scenario.recreate();
+            eventually("document.querySelector('.note-title')?.value === '保護しているメモ'");
+            assertEquals("true", evaluate("!document.querySelector('textarea')"));
+        } finally { scenario.close(); }
+    }
 }

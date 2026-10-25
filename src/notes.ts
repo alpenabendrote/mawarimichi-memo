@@ -1,7 +1,9 @@
 import { MAX_NOTES } from './quantum/simulator';
 import { isZenoMemory, type ZenoMemory } from './quantum/zeno';
 
-export interface Note { id: string; title: string; body: string; updatedAt: string; zeno?: ZenoMemory }
+import { parseSedimentArchive, parseSedimentMemory, validSedimentTime, type SedimentArchive, type SedimentMemory } from './sedimentModel';
+
+export interface Note { id: string; title: string; body: string; updatedAt: string; zeno?: ZenoMemory; lastUsedAt?: number; sediment?: SedimentArchive; sedimentWalk?: SedimentMemory }
 export const STORAGE_KEY = 'quantum-notepad.notes.v1';
 
 export function starterNotes(): Note[] {
@@ -24,8 +26,12 @@ export function parseNotes(raw: string): Note[] {
     if (typeof note.id !== 'string' || !note.id || ids.has(note.id) || typeof note.title !== 'string' || typeof note.body !== 'string' || typeof note.updatedAt !== 'string' || !Number.isFinite(Date.parse(note.updatedAt))) {
       throw new Error('保存データが不正です。');
     }
+    if (note.lastUsedAt !== undefined && !validSedimentTime(note.lastUsedAt)) throw new Error('最終利用時刻が不正です。');
     ids.add(note.id);
     return { id: note.id, title: note.title, body: note.body, updatedAt: note.updatedAt,
+      ...(note.lastUsedAt !== undefined ? { lastUsedAt: note.lastUsedAt as number } : {}),
+      ...(note.sediment !== undefined ? { sediment: parseSedimentArchive(note.sediment) } : {}),
+      ...(note.sedimentWalk !== undefined ? { sedimentWalk: parseSedimentMemory(note.sedimentWalk, note.id) } : {}),
       ...(isZenoMemory(note.zeno) ? { zeno: { basis: note.zeno.basis, at: note.zeno.at } } : {}) };
   });
 }

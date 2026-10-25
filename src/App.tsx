@@ -17,15 +17,18 @@ import { newZenoMemory } from './quantum/zeno';
 import { ZenoPanel } from './ZenoPanel';
 import { saveNotebook, type LoadedNotebook } from './notebookStorage';
 import { exportNotebook, mergeNotebookBackup } from './notebookBackup';
+import { coalesceSediments, touchNote } from './sedimentation';
+import { useSedimentation } from './useSedimentation';
+import { SedimentPanel } from './SedimentPanel';
 import { CoolingPanel } from './CoolingPanel';
 import { coolingPayload, removeCooledNote, startCoolingDeletion, type CoolingActivity } from './coolingDeletion';
 import CoolingWorker from './quantum/cooling.worker?worker&inline';
 
 function initialNotebook(provided?: LoadedNotebook) {
-  if (provided) return { ...provided, notes: initializeZenoNotes(provided.notes, Date.now()) };
+  if (provided) return { ...provided, notes: initializeZenoNotes(coalesceSediments(provided.notes), Date.now()) };
   try {
     const result = loadNotes(window.localStorage);
-    return { ...result, notes: initializeZenoNotes(result.notes, Date.now()) };
+    return { ...result, notes: initializeZenoNotes(coalesceSediments(result.notes), Date.now()) };
   }
   catch { return loadNotes({ getItem: () => { throw new Error('Storage unavailable'); } }); }
 }
@@ -58,12 +61,14 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   const coolingJob = useRef<{ cancel: () => void } | null>(null);
   const [cooling, setCooling] = useState<CoolingActivity | null>(null);
   const [coolingDetailsOpen, setCoolingDetailsOpen] = useState(false);
+  const [sedimentDetailsOpen, setSedimentDetailsOpen] = useState(false);
   const currentNotebook = useRef({ notes, activeId });
   currentNotebook.current = { notes, activeId };
   const titleRef = useRef<HTMLInputElement>(null);
   const display = useMemo(() => orderZenoNotes(notes, listTime), [notes, listTime]);
   const orderedNotes = useMemo(() => display.map(entry => entry.note), [display]);
   const active = notes.find(note => note.id === activeId);
+  const sedimentation = useSedimentation(notes, activeId, importing || cooling?.status === 'running' || duplication?.status === 'running' || (!!active?.sediment && openedId === activeId), initial.writable, setNotes);
   const target = orderedNotes.findIndex(note => note.id === activeId);
   const trace = useMemo(() => target < 0 ? null : prepareSearch(notes.length, target), [notes.length, target]);
   const visibleNotes = display.filter(({ note }) => noteTitle(note).toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
@@ -90,6 +95,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   }
   function selectNote(id: string) {
     clearDuplicate();
+    setNotes(previous => previous.map(note => note.id === id ? touchNote(note, Date.now()) : note));
     setActiveId(id); setOpenedId(null); setMeasurementStep(null); setMessage('');
     setView('note');
     setListTime(Date.now());
@@ -113,7 +119,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
       setDuplication({ status: 'cancelled', source: 'タイトル・本文' });
     }
     const now = Date.now();
-    setNotes(previous => previous.map(note => note.id === activeId ? { ...note, [field]: value, updatedAt: new Date(now).toISOString(), zeno: newZenoMemory(now) } : note));
+    setNotes(previous => previous.map(note => note.id === activeId ? { ...touchNote(note, now), [field]: value, updatedAt: new Date(now).toISOString(), zeno: newZenoMemory(now) } : note));
     setListTime(now);
   }
   function deleteNote() {
@@ -164,7 +170,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
         clearDuplicate();
         const now = Date.now();
         setNotes(initializeZenoNotes(result.notes, now)); setListTime(now);
-        setActiveId(result.notes[result.notes.length - result.added].id); setOpenedId(null);
+        setActiveId(result.firstAddedId ?? result.notes[0]?.id ?? null); setOpenedId(null);
         setFilter(''); setMeasurementStep(null); setView('note');
       }
       setMessage(result.added ? result.added + '件のメモを読み込みました。' : '同じメモは追加しませんでした。');
@@ -193,7 +199,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
 
   function recordReading(id: string, reason: ZenoReadRecord['reason']) {
     const result = readNoteZeno(notes, id, reason, Date.now());
-    setNotes(result.notes); setZenoRecord(result.record); setListTime(result.record.run.at);
+    setNotes(result.notes.map(note => note.id === id ? touchNote(note, result.record.run.at) : note)); setZenoRecord(result.record); setListTime(result.record.run.at);
   }
 
   function duplicateNote() {
@@ -242,12 +248,13 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
     <aside className="sidebar" aria-label="メモ一覧">
       <header className="list-header"><h1>メモ帳</h1><button onClick={newNote} disabled={notes.length >= MAX_NOTES}>新規</button></header>
       <input className="filter" aria-label="タイトルを絞り込む" placeholder="タイトルを絞り込む" value={filter} onChange={event => setFilter(event.target.value)} />
-      <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
+      <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{note.sediment && <small className="dormant-label">堆積</small>}{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
       <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes} disabled={exporting}>JSONを書き出す</button><button className="link-button" disabled={!initial.writable || importing} onClick={() => importRef.current?.click()}>JSONを読み込む</button></footer>
     </aside>
     <input ref={importRef} type="file" accept="application/json,.json" disabled={importing || !initial.writable} hidden aria-label="読み込むJSONファイル" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void importNotes(file); }} />
     <main className="main">
       {saveError && <p role="alert" className="notice error">{saveError}</p>}
+      {sedimentation.undo && <div role="status" className="notice">{sedimentation.undo.sourceIds.length}件のメモが堆積しました。<button className="link-button" onClick={sedimentation.restore} disabled={!sedimentation.canUndo} title={sedimentation.canUndo ? undefined : "堆積への追記・編集、IDの重複、または件数上限のため戻せません。"}>取り込みを戻す</button><button className="dismiss" aria-label="堆積の通知を閉じる" onClick={sedimentation.dismiss}>×</button></div>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       <>
         <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : saving ? '保存中…' : '自動保存'}</span><div>{active && trace && <><button onClick={deleteNote} disabled={cooling?.status === 'running' || !initial.writable} aria-busy={cooling?.status === 'running'}>{cooling?.status === 'running' ? '消去中…' : '削除'}</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></>}</div></header>
@@ -260,6 +267,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
             {active && trace ? <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} /> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
           </section>
           <section id="calculation-pane" className="calculation-pane" aria-label="回路・計算欄" tabIndex={0}>
+            <SedimentPanel notes={notes} run={sedimentation.run} status={sedimentation.status} open={sedimentDetailsOpen} onOpenChange={setSedimentDetailsOpen} />
             <CoolingPanel activity={cooling} open={coolingDetailsOpen} onOpenChange={setCoolingDetailsOpen} />
             {active && trace && <><QuantumPanel trace={trace} notes={orderedNotes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
             <ZenoPanel note={active} at={listTime} record={zenoRecord} open={zenoDetailsOpen} onOpenChange={setZenoDetailsOpen} />
