@@ -45,6 +45,8 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
+          disk-size: 4G
+          emulator-boot-timeout: 300
           disable-animations: true
           script: |
             adb shell svc wifi disable
