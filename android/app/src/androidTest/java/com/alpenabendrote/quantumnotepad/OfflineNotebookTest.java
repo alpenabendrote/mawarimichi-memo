@@ -75,7 +75,7 @@ public class OfflineNotebookTest {
             note.put("id", "sediment-" + i);
             note.put("title", i == 0 ? "保護しているメモ" : "古いメモ " + i);
             note.put("body", "元の本文🪐 [" + i + "]");
-            note.put("updatedAt", i == 0 ? java.time.Instant.now().toString() : "2020-01-01T00:00:00.000Z");
+            note.put("updatedAt", i == 0 ? java.time.Instant.now().toString() : java.time.Instant.now().minus(java.time.Duration.ofDays(8)).toString());
             notes.put(note);
         }
         android.content.SharedPreferences prefs = InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0);
@@ -97,6 +97,10 @@ public class OfflineNotebookTest {
             // Every original body is still in its source note or in the combined archive.
             for (int i = 0; i < 32; i++) assertTrue("Missing original body " + i, all.contains("元の本文🪐 [" + i + "]"));
             assertTrue(all.contains("\"sedimentWalk\"") || all.contains("\"sediment\""));
+            String lastMeasurement = evaluate("document.querySelector('.sediment-status').textContent");
+            evaluate("window.dispatchEvent(new Event('focus'))");
+            eventually("document.querySelector('.sediment-status')?.textContent.includes('回測定')");
+            assertEquals("A preparation-only check must retain the last measured circuit", lastMeasurement, evaluate("document.querySelector('.sediment-status').textContent"));
             scenario.recreate();
             eventually("document.querySelector('.note-title')?.value === '保護しているメモ'");
             assertEquals("true", evaluate("!document.querySelector('textarea')"));

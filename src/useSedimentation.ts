@@ -34,7 +34,8 @@ export function useSedimentation(notes: Note[], activeId: string | null, paused:
           const next = applySedimentation(notes, result);
           processed.current = tick; stop();
           setNotes(previous => previous === notes ? next.notes : previous);
-          setRun({ ...result, titles: Object.fromEntries(notes.map(n => [n.id, n.title.trim() || '無題のメモ'])) }); setStatus('idle');
+          const record = { ...result, titles: Object.fromEntries(notes.map(n => [n.id, n.title.trim() || '無題のメモ'])) };
+          setRun(previous => result.outcomes.some(o => o.last) || !previous ? record : previous); setStatus('idle');
           if (next.sources.length && next.archive) setUndo({ before: notes, afterArchive: next.archive, sourceIds: next.sources.map(n => n.id) });
         } catch { fail(); }
       };
