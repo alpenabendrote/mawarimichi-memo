@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadNotes, noteTitle, STORAGE_KEY, type Note } from './notes';
+import { loadNotes, noteTitle, type Note } from './notes';
 import { MAX_NOTES, prepareSearch } from './quantum/simulator';
 import { QuantumPanel } from './QuantumPanel';
 import { NoteEditor } from './NoteEditor';
@@ -15,8 +15,11 @@ import { QuantumWalkPanel, type WalkRecord } from './QuantumWalkPanel';
 import { initializeZenoNotes, orderZenoNotes, readNoteZeno, type ZenoReadRecord } from './zenoNotes';
 import { newZenoMemory } from './quantum/zeno';
 import { ZenoPanel } from './ZenoPanel';
+import { saveNotebook, type LoadedNotebook } from './notebookStorage';
+import { exportNotebook, mergeNotebookBackup } from './notebookBackup';
 
-function initialNotebook() {
+function initialNotebook(provided?: LoadedNotebook) {
+  if (provided) return { ...provided, notes: initializeZenoNotes(provided.notes, Date.now()) };
   try {
     const result = loadNotes(window.localStorage);
     return { ...result, notes: initializeZenoNotes(result.notes, Date.now()) };
@@ -24,14 +27,18 @@ function initialNotebook() {
   catch { return loadNotes({ getItem: () => { throw new Error('Storage unavailable'); } }); }
 }
 
-export function App() {
-  const [initial] = useState(initialNotebook);
+export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNotebook; persist?: (notes: Note[]) => Promise<void> } = {}) {
+  const [initial] = useState(() => initialNotebook(notebook));
   const [notes, setNotes] = useState<Note[]>(initial.notes);
   const [activeId, setActiveId] = useState<string | null>(initial.notes[0]?.id ?? null);
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [saveError, setSaveError] = useState<string | null>(initial.error);
   const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
   const [listTime, setListTime] = useState(Date.now);
   const [zenoRecord, setZenoRecord] = useState<ZenoReadRecord | null>(null);
   const [zenoDetailsOpen, setZenoDetailsOpen] = useState(false);
@@ -59,9 +66,12 @@ export function App() {
 
   useEffect(() => {
     if (!initial.writable) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); setSaveError(null); }
-    catch { setSaveError('保存できません。JSONを書き出して内容を保存してください。'); }
-  }, [notes, initial.writable]);
+    let current = true; setSaving(true);
+    persist(notes).then(() => { if (current) { setSaveError(null); setSaving(false); } }).catch(() => {
+      if (current) { setSaveError('保存できません。JSONを書き出して内容を保存してください。'); setSaving(false); }
+    });
+    return () => { current = false; };
+  }, [notes, initial.writable, persist]);
 
   function clearDuplicate() {
     duplicateJob.current?.cancel(); duplicateJob.current = null; setDuplication(null);
@@ -109,12 +119,28 @@ export function App() {
     const restored = [...notes]; restored.splice(deleted.index, 0, deleted.note);
     setNotes(restored); selectNote(deleted.note.id); setDeleted(null); setFilter('');
   }
-  function exportNotes() {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(notes, null, 2)], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url; link.download = `notes-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function exportNotes() {
+    setExporting(true);
+    try { await exportNotebook(notes); }
+    catch (error) {
+      if (!(error instanceof Error && /cancel/i.test(error.message))) setMessage('JSONを書き出せませんでした。もう一度お試しください。');
+    } finally { setExporting(false); }
+  }
+  async function importNotes(file: File) {
+    if (!initial.writable || importing) return;
+    setImporting(true);
+    try {
+      const raw = await file.text();
+      const result = mergeNotebookBackup(currentNotebook.current.notes, raw);
+      if (result.added) {
+        clearDuplicate();
+        const now = Date.now();
+        setNotes(initializeZenoNotes(result.notes, now)); setListTime(now);
+        setActiveId(result.notes[result.notes.length - result.added].id); setOpenedId(null);
+        setFilter(''); setMeasurementStep(null); setView('note');
+      }
+      setMessage(result.added ? result.added + '件のメモを読み込みました。' : '同じメモは追加しませんでした。');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'JSONを読み込めませんでした。'); } finally { setImporting(false); }
   }
   function observe() {
     if (!active) return;
@@ -189,13 +215,14 @@ export function App() {
       <header className="list-header"><h1>メモ帳</h1><button onClick={newNote} disabled={notes.length >= MAX_NOTES}>新規</button></header>
       <input className="filter" aria-label="タイトルを絞り込む" placeholder="タイトルを絞り込む" value={filter} onChange={event => setFilter(event.target.value)} />
       <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
-      <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes}>JSONを書き出す</button></footer>
+      <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes} disabled={exporting}>JSONを書き出す</button><button className="link-button" disabled={!initial.writable || importing} onClick={() => importRef.current?.click()}>JSONを読み込む</button></footer>
     </aside>
+    <input ref={importRef} type="file" accept="application/json,.json" disabled={importing || !initial.writable} hidden aria-label="読み込むJSONファイル" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void importNotes(file); }} />
     <main className="main">
       {saveError && <p role="alert" className="notice error">{saveError}</p>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       {active && trace ? <>
-        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
+        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : saving ? '保存中…' : '自動保存'}</span><div><button onClick={deleteNote}>削除</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></div></header>
         <div className="view-switch" role="group" aria-label="表示する欄">
           <button aria-pressed={view === 'note'} aria-controls="note-pane" onClick={() => setView('note')}>メモ</button>
           <button aria-pressed={view === 'calculation'} aria-controls="calculation-pane" onClick={() => setView('calculation')}>回路・計算</button>
@@ -213,8 +240,8 @@ export function App() {
             <SimilarNotes notes={orderedNotes} activeId={active.id} onSelect={selectNote} />
           </section>
         </div>
-        <p className="observation-message" role="status">{message}</p>
       </> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
+      <p className="observation-message" role="status">{message}</p>
     </main>
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
   </div>;

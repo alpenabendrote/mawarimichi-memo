@@ -1,0 +1,18 @@
+{
+  "appId": "com.alpenabendrote.quantumnotepad",
+  "appName": "量子メモ帳",
+  "webDir": "dist",
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https"
+  },
+  "android": {
+    "initialFocus": false,
+    "minWebViewVersion": 111
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native"
+    }
+  }
+}

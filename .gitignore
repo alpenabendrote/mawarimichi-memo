@@ -4,3 +4,8 @@ coverage/
 *.local
 .DS_Store
 *.log
+
+artifacts/
+android/keystore.properties
+*.jks
+*.keystore

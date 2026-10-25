@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">量子メモ帳</string>
+    <string name="title_activity_main">量子メモ帳</string>
+    <string name="package_name">com.alpenabendrote.quantumnotepad</string>
+    <string name="custom_url_scheme">com.alpenabendrote.quantumnotepad</string>
+</resources>

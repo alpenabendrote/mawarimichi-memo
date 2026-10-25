@@ -1,0 +1,59 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['android/**', 'capacitor.config.json', 'package*.json', 'scripts/android-apk.mjs', '.github/workflows/android.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm test
+      - run: npm run android:sync
+      - run: chmod +x android/gradlew
+      - name: Build installable debug APK
+        run: ./android/gradlew -p android assembleDebug -PappVersionCode=$GITHUB_RUN_NUMBER --no-daemon
+      - uses: actions/upload-artifact@v7
+        with:
+          name: quantum-notepad-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Offline Android smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb shell svc wifi disable
+            adb shell svc data disable
+            ./android/gradlew -p android connectedSmokeAndroidTest --no-daemon
+      - name: Android test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: android/app/build/reports/androidTests
+          if-no-files-found: ignore
