@@ -1,8 +1,12 @@
 // Preserve legal text that Android packaging would otherwise merge or discard.
 // This task reads already resolved build dependencies; it makes no app-time requests.
 def nativeNoticesDir = layout.buildDirectory.dir('generated/nativeNotices/assets')
-def nativeNotices = tasks.register('generateNativeNotices') {
-    outputs.dir(nativeNoticesDir)
+abstract class NativeNoticesTask extends DefaultTask {
+    @org.gradle.api.tasks.OutputDirectory
+    abstract org.gradle.api.file.DirectoryProperty getOutputDirectory()
+}
+def nativeNotices = tasks.register('generateNativeNotices', NativeNoticesTask) {
+    outputDirectory.set(nativeNoticesDir)
     outputs.upToDateWhen { false }
     doLast {
         def sections = []
@@ -48,7 +52,8 @@ def nativeNotices = tasks.register('generateNativeNotices') {
         output.setText(sections.join('\n\n' + ('=' * 72) + '\n\n') + '\n', 'UTF-8')
     }
 }
-android.sourceSets.main.assets.srcDir(nativeNoticesDir)
-tasks.configureEach {
-    if (name ==~ /merge.*Assets/) dependsOn(nativeNotices)
+// Register the producing task with AGP so merge-assets and release lint both
+// carry its dependency, including when different variants are built in order.
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    variant.sources.assets.addGeneratedSourceDirectory(nativeNotices) { task -> task.outputDirectory }
 }
