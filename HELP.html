@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>メモ帳のヘルプ</title>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>遠回りメモのヘルプ</title>
 <style>
 :root{font-family:system-ui,"Yu Gothic UI",sans-serif;color:#222;background:white;font-synthesis:none}*{box-sizing:border-box}body{margin:0;padding:32px 20px}code{font-family:ui-monospace,Consolas,monospace}:focus-visible{outline:2px solid #666;outline-offset:2px}
 .help-dialog { width: min(900px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #bbb; border-radius: 2px; color: #222; background: white; }
@@ -40,7 +40,8 @@
 
 @media print{body{padding:0}.help-article{max-width:none;font-size:10pt}.help-toc{break-inside:avoid}.help-article h2,.help-article h3{break-after:avoid}.help-article tr{break-inside:avoid}.help-article a{color:inherit}}
 </style></head><body><main><article class="help-article">
-  <h1>メモ帳の使い方と量子計算</h1>
+  <h1>遠回りメモの使い方と量子計算</h1>
+  <p>量子回路をシミュレーションする、ちょっと遠回りなメモ帳。計算は端末内で行い、量子コンピュータは使用しません。</p>
   <p>普通にメモを書きながら、検索・削除・堆積・複製・貼り付け・似たメモの比較・おまかせ・読む間隔による一覧の整理に量子回路のシミュレーションを使うメモ帳です。このヘルプは、現在実装されている機能の説明です。量子の知識がなくても、基本操作から使い始められます。</p>
   <p>計算はブラウザ内の通常のコンピューターで実行します。実際の量子コンピューターや量子通信は使用しません。計算を省くための仕組みではなく、普通なら簡単に済む操作を、量子計算の手順で遠回りすることがこのアプリの特徴です。</p>
 
@@ -65,6 +66,7 @@
       <li><a href="#help-delete">振幅減衰でメモを削除する</a></li>
       <li><a href="#help-sediment">量子ウォークで古いメモを堆積させる</a></li>
       <li><a href="#help-licenses">ライセンスと通信について</a></li>
+      <li><a href="#help-disclaimer">備考（テストと不具合について）</a></li>
     </ol>
   </nav>
 
@@ -401,7 +403,7 @@
     <h2>18. ライセンスと通信について</h2>
     <p>このアプリの自作部分はMITライセンスです。利用しているライブラリには、それぞれのライセンスが適用されます。以下に著作権表示とライセンス全文を同梱しています。表示するための通信は不要です。</p>
     <p>メモの保存と量子計算は端末内で行います。Android版はインターネットの通信権限を持たず、絵文字フォントの自動取得も無効にしています。参考資料のリンクを押すと外部ブラウザが開き、JSONの書き出しでは自分で共有先を選べます。外部ブラウザや選んだ共有先は、それぞれのアプリとして動作します。</p>
-    <details class="license-details"><summary>著作権表示・ライセンス全文</summary><pre>Quantum Notepad — licenses and third-party notices
+    <details class="license-details"><summary>著作権表示・ライセンス全文</summary><pre>遠回りメモ — licenses and third-party notices
 
 The original application is MIT licensed. Third-party components retain their own licenses.
 Build tools run during development; their generated browser helpers are attributed separately below.
@@ -1035,6 +1037,10 @@ Gradle wrapper (repository/build tooling only)
 https://gradle.org/
 Apache License 2.0. The wrapper JAR retains its embedded META-INF/LICENSE, and the launch scripts retain their original headers.
 </pre></details>
+  </section>
+  <section id="help-disclaimer">
+    <h2>19. 備考</h2>
+    <p>テストは十分ではありません。動作不具合等が発生する場合がありますので、あらかじめご了承ください。</p>
   </section>
 </article>
 </main></body></html>

@@ -1,4 +1,4 @@
-# Androidで単体利用する
+# 遠回りメモをAndroidで単体利用する
 
 普段はReact / TypeScript / Viteで開発し、必要なときにCapacitorでAPKを作ります。画面・ヘルプ・量子計算・Web WorkerはAPKに同梱され、インストール後はPCやサーバー、通信接続なしで使えます。
 

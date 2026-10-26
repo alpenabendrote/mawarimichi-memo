@@ -1,4 +1,4 @@
-Quantum Notepad — licenses and third-party notices
+遠回りメモ — licenses and third-party notices
 
 The original application is MIT licensed. Third-party components retain their own licenses.
 Build tools run during development; their generated browser helpers are attributed separately below.

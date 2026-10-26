@@ -4,7 +4,7 @@ const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8').replace(/\r\n/g, '\n').trimEnd();
 const lock = JSON.parse(read('package-lock.json'));
 const sections = [
-  'Quantum Notepad — licenses and third-party notices\n\nThe original application is MIT licensed. Third-party components retain their own licenses.\nBuild tools run during development; their generated browser helpers are attributed separately below.',
+  '遠回りメモ — licenses and third-party notices\n\nThe original application is MIT licensed. Third-party components retain their own licenses.\nBuild tools run during development; their generated browser helpers are attributed separately below.',
   'Original application\n\n' + read('LICENSE'),
 ];
 for (const [path, pkg] of Object.entries(lock.packages).sort(([a], [b]) => a.localeCompare(b, 'en'))) {

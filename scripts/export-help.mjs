@@ -11,7 +11,7 @@ for (const match of content.matchAll(/href="#([^"]+)"/g)) {
   if (!ids.includes(match[1])) throw new Error(`Missing help anchor: ${match[1]}`);
 }
 const document = `<!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>メモ帳のヘルプ</title>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>遠回りメモのヘルプ</title>
 <style>
 :root{font-family:system-ui,"Yu Gothic UI",sans-serif;color:#222;background:white;font-synthesis:none}*{box-sizing:border-box}body{margin:0;padding:32px 20px}code{font-family:ui-monospace,Consolas,monospace}:focus-visible{outline:2px solid #666;outline-offset:2px}
 ${css}

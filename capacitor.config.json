@@ -1,6 +1,6 @@
 {
   "appId": "com.alpenabendrote.quantumnotepad",
-  "appName": "量子メモ帳",
+  "appName": "遠回りメモ",
   "webDir": "dist",
   "server": {
     "hostname": "localhost",
