@@ -8,7 +8,7 @@ def nativeNotices = tasks.register('generateNativeNotices') {
         def sections = []
         def approvedApache = { String group ->
             group.startsWith('androidx.') ||
-            group in ['org.jetbrains', 'org.jetbrains.kotlin', 'org.jetbrains.kotlinx', 'org.apache.cordova']
+            group in ['org.jetbrains', 'org.jetbrains.kotlin', 'org.jetbrains.kotlinx', 'org.apache.cordova', 'org.jspecify', 'com.google.guava', 'com.google.errorprone']
         }
         def addZipNotices
         addZipNotices = { byte[] bytes, String origin ->
@@ -26,17 +26,22 @@ def nativeNotices = tasks.register('generateNativeNotices') {
                 }
             } finally { zip.close() }
         }
-        configurations.releaseRuntimeClasspath.resolvedConfiguration.resolvedArtifacts
-            .findAll { it.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
-            .sort { it.moduleVersion.id.toString() }
-            .each { artifact ->
-                def id = artifact.moduleVersion.id
-                if (!approvedApache(id.group) && !(id.group == 'io.ionic.libs' && id.name == 'ionfilesystem-android' && id.version == '1.1.1')) {
-                    throw new GradleException('Review the license of new native dependency ' + id + ' and update native-notices.gradle before distributing.')
-                }
-                sections << id.toString() + '\nDeclared license: ' + (approvedApache(id.group) ? 'Apache-2.0' : 'MIT')
-                addZipNotices(artifact.file.bytes, id.toString())
-            }
+        // Filter project components before artifact selection: Android projects publish
+        // many artifact variants, while this collector only needs external AARs/JARs.
+        def artifacts = configurations.releaseRuntimeClasspath.incoming.artifactView {
+            componentFilter { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+        }.artifacts.artifacts.sort { it.id.componentIdentifier.toString() }
+        def unknown = artifacts.findAll {
+            def id = it.id.componentIdentifier
+            !approvedApache(id.group) && !(id.group == 'io.ionic.libs' && id.module == 'ionfilesystem-android' && id.version == '1.1.1')
+        }
+        logger.lifecycle('Native notice inventory: ' + artifacts.collect { it.id.componentIdentifier }.join(', '))
+        if (unknown) throw new GradleException('Review native licenses before distributing: ' + unknown.collect { it.id.componentIdentifier }.join(', '))
+        artifacts.each { artifact ->
+            def id = artifact.id.componentIdentifier
+            sections << id.toString() + '\nDeclared license: ' + (approvedApache(id.group) ? 'Apache-2.0' : 'MIT')
+            addZipNotices(artifact.file.bytes, id.toString())
+        }
         sections << rootProject.file('../THIRD_PARTY_NOTICES.txt').getText('UTF-8')
         def output = nativeNoticesDir.get().file('native-third-party-notices.txt').asFile
         output.parentFile.mkdirs()
