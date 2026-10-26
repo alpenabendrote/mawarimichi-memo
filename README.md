@@ -2,6 +2,16 @@
 
 タイトルを選び、「量子検索」で本文を開くメモ帳です。グローバーの回路をブラウザ内でシミュレーションします。
 
+## ライセンスと通信
+
+自作部分は[MITライセンス](LICENSE)です。利用ライブラリの著作権表示とライセンス全文は[THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)およびアプリ内の「ヘルプ → ライセンスと通信について」に同梱しています。第三者のソフトウェアに自作部分のMITを上書き適用するものではありません。
+
+メモ・量子計算は端末内で処理します。AndroidアプリはINTERNET権限を持たず、EmojiCompatのフォント自動取得を無効にしています。参考資料を開いた外部ブラウザ、JSON書き出しでユーザーが選択した共有先、開発時のnpm・Gradleは別に通信することがあります。
+
+ビルド時に実行用npm依存の実際のLICENSE・NOTICEを収集し、ヘルプ・Web配布物・単独HTML・APKに含めます。Androidでは解決済みAAR/JARの追加LICENSE・NOTICEも回収し、APKのassets/native-third-party-notices.txtに保存します。新しい種類のネイティブ依存はライセンス確認までビルドを停止します。依存を更新する場合はライセンス条件も再確認してください。
+
+開発用xcodeが使うuuidは、CommonJSの互換性を保つ修正版11.1.1に限定しています。通常のアプリ画面には含まれません。
+
 ## Androidで使う
 
 同じTypeScriptコードから、端末単体でオフライン利用できるAPKを作成できます。手順は[ANDROID.md](ANDROID.md)をご覧ください。PCで開発するときは従来どおりnpm run dev、APKはnpm run android:apk、GitHub上ではActionsのAndroid APKから作成できます。
@@ -23,7 +33,7 @@ npm run build
 npm run preview
 ```
 
-ビルドは型検査を行い、`dist/` に静的ファイルを出力します。
+ビルドは型検査を行い、`dist/` に静的ファイルを出力します。同時に、ライセンスを含む単独ファイル版 `artifacts/quantum-notes.html` を生成します。
 
 ## 使い方
 

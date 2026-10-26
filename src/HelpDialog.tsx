@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
-import helpContent from './help-content.html?raw';
+import helpTemplate from './help-content.html?raw';
+import notices from '../THIRD_PARTY_NOTICES.txt?raw';
+const escapeHtml = (value: string) => value.replace(/[&<>]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[character]!));
+const helpContent = helpTemplate.replace('<!-- LICENSE_TEXT -->', () => escapeHtml(notices));
 import './help.css';
 
 export function HelpDialog({ onClose }: { onClose: () => void }) {

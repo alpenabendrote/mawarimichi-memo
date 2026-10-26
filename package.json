@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "node scripts/export-help.mjs && tsc --noEmit && vite build",
+    "build": "node scripts/generate-notices.mjs && node scripts/export-help.mjs && tsc --noEmit && vite build && node scripts/export-standalone.mjs",
     "help:export": "node scripts/export-help.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "android:sync": "npm run build && cap sync android",
     "android:open": "npm run android:sync && cap open android",
-    "android:apk": "node scripts/android-apk.mjs"
+    "android:apk": "node scripts/android-apk.mjs",
+    "licenses:generate": "node scripts/generate-notices.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",
@@ -30,5 +31,11 @@
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5"
+  },
+  "license": "MIT",
+  "overrides": {
+    "xcode": {
+      "uuid": "11.1.1"
+    }
   }
 }

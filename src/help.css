@@ -30,3 +30,6 @@
   .help-scroll { padding: 16px; }
   .help-article h1 { font-size: 19px; }
 }
+
+.license-details summary { cursor: pointer; }
+.help-article .license-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.6; }

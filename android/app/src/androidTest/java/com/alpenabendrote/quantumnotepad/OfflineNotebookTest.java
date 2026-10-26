@@ -26,6 +26,37 @@ public class OfflineNotebookTest {
         do { if ("true".equals(evaluate(js))) return; Thread.sleep(100); } while (System.currentTimeMillis() < end);
         fail("WebView assertion did not become true: " + js);
     }
+    @Test public void noInternetPermissionOrEmojiDownloadAndLicensesAreAvailableOffline() throws Exception {
+        android.content.Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
+            context.checkSelfPermission(android.Manifest.permission.INTERNET));
+        android.content.pm.ProviderInfo provider = context.getPackageManager().getProviderInfo(
+            new android.content.ComponentName(context, "androidx.startup.InitializationProvider"),
+            android.content.pm.PackageManager.GET_META_DATA);
+        assertTrue(provider.metaData == null ||
+            !provider.metaData.containsKey("androidx.emoji2.text.EmojiCompatInitializer"));
+        try (java.io.InputStream stream = context.getAssets().open("native-third-party-notices.txt")) {
+            String notices = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(notices.contains("org.apache.cordova:framework:14.0.1"));
+            assertTrue(notices.contains("Apache Cordova"));
+            assertTrue(notices.contains("The Apache Software Foundation"));
+            assertTrue(notices.contains("io.ionic.libs:ionfilesystem-android:1.1.1"));
+            assertTrue(notices.contains("TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION"));
+            assertTrue(notices.contains("Meta Platforms"));
+        }
+        scenario = ActivityScenario.launch(MainActivity.class);
+        try {
+            eventually("!!document.querySelector('.note-title')");
+            evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='ヘルプ').click()");
+            eventually("!!document.querySelector('.license-details')");
+            evaluate("document.querySelector('.license-details > summary').click()");
+            assertEquals("true", evaluate("document.querySelector('.license-details').open"));
+            assertEquals("true", evaluate("document.querySelector('.license-details').textContent.includes('Copyright (c) 2026 alpenabendrote')"));
+            assertEquals("true", evaluate("document.querySelector('.license-details').textContent.includes('Meta Platforms')"));
+            assertEquals("true", evaluate("document.querySelector('.license-details').textContent.includes('The Apache Software Foundation')"));
+        } finally { scenario.close(); }
+    }
+
     @Test public void offlineEditingWorkersAndNativeStorageSurviveActivityRecreation() throws Exception {
         InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0).edit().clear().commit();
         scenario = ActivityScenario.launch(MainActivity.class);

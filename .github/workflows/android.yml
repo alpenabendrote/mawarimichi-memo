@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['android/**', 'capacitor.config.json', 'package*.json', 'scripts/android-apk.mjs', '.github/workflows/android.yml']
+    paths: ['android/**', 'src/**', 'public/**', 'licenses/**', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'capacitor.config.json', 'vite.config.ts', 'index.html', 'package*.json', 'scripts/**', '.github/workflows/android.yml']
 
 permissions:
   contents: read
@@ -29,6 +29,11 @@ jobs:
       - run: chmod +x android/gradlew
       - name: Build installable debug APK
         run: ./android/gradlew -p android assembleDebug -PappVersionCode=$GITHUB_RUN_NUMBER --no-daemon
+      - name: Verify release APK permissions, legal texts and non-debuggable build
+        run: |
+          ./android/gradlew -p android assembleRelease -PappVersionCode=$GITHUB_RUN_NUMBER --no-daemon
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" manifest print android/app/build/outputs/apk/release/app-release-unsigned.apk > /tmp/quantum-notepad-release-manifest.xml
+          python3 scripts/verify-apk.py android/app/build/outputs/apk/release/app-release-unsigned.apk /tmp/quantum-notepad-release-manifest.xml
       - uses: actions/upload-artifact@v7
         with:
           name: quantum-notepad-debug
@@ -56,6 +61,13 @@ jobs:
             adb shell svc wifi disable
             adb shell svc data disable
             ./android/gradlew -p android connectedSmokeAndroidTest --no-daemon
+      - name: Native dependency notices
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-third-party-notices
+          path: android/app/build/generated/nativeNotices/assets/native-third-party-notices.txt
+          if-no-files-found: error
       - name: Android test reports
         if: always()
         uses: actions/upload-artifact@v7

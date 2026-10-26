@@ -13,6 +13,9 @@
   "plugins": {
     "SystemBars": {
       "insetsHandling": "native"
+    },
+    "CapacitorHttp": {
+      "enabled": false
     }
   }
 }

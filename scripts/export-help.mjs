@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = new URL('../', import.meta.url);
-const content = readFileSync(new URL('src/help-content.html', root), 'utf8');
+const notices = readFileSync(new URL('THIRD_PARTY_NOTICES.txt', root), 'utf8');
+const escapedNotices = notices.replace(/[&<>]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[character]));
+const content = readFileSync(new URL('src/help-content.html', root), 'utf8').replace('<!-- LICENSE_TEXT -->', () => escapedNotices);
 const css = readFileSync(new URL('src/help.css', root), 'utf8');
 const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
 if (new Set(ids).size !== ids.length) throw new Error('Duplicate help anchor');

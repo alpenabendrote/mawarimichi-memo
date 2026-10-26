@@ -1,0 +1,49 @@
+// Preserve legal text that Android packaging would otherwise merge or discard.
+// This task reads already resolved build dependencies; it makes no app-time requests.
+def nativeNoticesDir = layout.buildDirectory.dir('generated/nativeNotices/assets')
+def nativeNotices = tasks.register('generateNativeNotices') {
+    outputs.dir(nativeNoticesDir)
+    outputs.upToDateWhen { false }
+    doLast {
+        def sections = []
+        def approvedApache = { String group ->
+            group.startsWith('androidx.') ||
+            group in ['org.jetbrains', 'org.jetbrains.kotlin', 'org.jetbrains.kotlinx', 'org.apache.cordova']
+        }
+        def addZipNotices
+        addZipNotices = { byte[] bytes, String origin ->
+            def zip = new java.util.zip.ZipInputStream(new ByteArrayInputStream(bytes))
+            try {
+                def entry
+                while ((entry = zip.nextEntry) != null) {
+                    if (entry.directory) continue
+                    def name = entry.name
+                    if (name ==~ /(?i)(.*\/)?(LICENSE|LICENCE|NOTICE|COPYRIGHT)([._-].*)?/) {
+                        sections << origin + '!/' + name + '\n\n' + new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                    } else if (name.endsWith('.jar')) {
+                        addZipNotices(zip.readAllBytes(), origin + '!/' + name)
+                    }
+                }
+            } finally { zip.close() }
+        }
+        configurations.releaseRuntimeClasspath.resolvedConfiguration.resolvedArtifacts
+            .findAll { it.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+            .sort { it.moduleVersion.id.toString() }
+            .each { artifact ->
+                def id = artifact.moduleVersion.id
+                if (!approvedApache(id.group) && !(id.group == 'io.ionic.libs' && id.name == 'ionfilesystem-android' && id.version == '1.1.1')) {
+                    throw new GradleException('Review the license of new native dependency ' + id + ' and update native-notices.gradle before distributing.')
+                }
+                sections << id.toString() + '\nDeclared license: ' + (approvedApache(id.group) ? 'Apache-2.0' : 'MIT')
+                addZipNotices(artifact.file.bytes, id.toString())
+            }
+        sections << rootProject.file('../THIRD_PARTY_NOTICES.txt').getText('UTF-8')
+        def output = nativeNoticesDir.get().file('native-third-party-notices.txt').asFile
+        output.parentFile.mkdirs()
+        output.setText(sections.join('\n\n' + ('=' * 72) + '\n\n') + '\n', 'UTF-8')
+    }
+}
+android.sourceSets.main.assets.srcDir(nativeNoticesDir)
+tasks.configureEach {
+    if (name ==~ /merge.*Assets/) dependsOn(nativeNotices)
+}
