@@ -57,6 +57,40 @@ public class OfflineNotebookTest {
         } finally { scenario.close(); }
     }
 
+    @Test public void quantumSaveWaitsForCorrectionAndRecoversFromWorkerFailureOffline() throws Exception {
+        android.content.SharedPreferences prefs = InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0);
+        prefs.edit().clear().commit();
+        scenario = ActivityScenario.launch(MainActivity.class);
+        try {
+            eventually("document.querySelector('.save-details')?.textContent.includes('端末への保存完了')");
+            evaluate("document.querySelector('.save-details > summary').click()");
+            assertEquals("true", evaluate("document.querySelector('.save-details').open"));
+            String before = prefs.getString("quantum-notepad.notes.v1", "");
+            // The real inline worker has to complete before the final typed title reaches Preferences.
+            evaluate("(()=>{const e=document.querySelector('.note-title');for(const text of ['編集中1','編集中2','訂正後に保存されたタイトル']){Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,text);e.dispatchEvent(new Event('input',{bubbles:true}));}})()");
+            assertEquals("No early ordinary save is allowed", before, prefs.getString("quantum-notepad.notes.v1", ""));
+            eventually("document.querySelector('.save-details')?.textContent.includes('端末への保存完了') && document.querySelector('.note-toolbar')?.textContent.includes('自動保存')");
+            String corrected = prefs.getString("quantum-notepad.notes.v1", "");
+            assertTrue(corrected.contains("訂正後に保存されたタイトル"));
+            assertFalse(corrected.contains("編集中1"));
+            assertEquals("true", evaluate("document.querySelector('.save-details').open"));
+            assertEquals("true", evaluate("document.querySelector('.save-details').textContent.includes('5量子ビット')"));
+            evaluate("(()=>{const e=document.querySelector('#save-stage');e.value='5';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()");
+            assertEquals("Viewing a recorded stage must not save again", corrected, prefs.getString("quantum-notepad.notes.v1", ""));
+            // A worker creation failure must leave the previous persisted snapshot in place.
+            evaluate("window.__testSaveWorker=window.Worker;window.Worker=class {constructor(){throw new Error('test unavailable')}}");
+            evaluate("(()=>{const e=document.querySelector('.note-title');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'まだ保存されていないタイトル');e.dispatchEvent(new Event('input',{bubbles:true}));})()");
+            eventually("document.querySelector('.note-toolbar')?.textContent.includes('未保存')");
+            assertEquals(corrected, prefs.getString("quantum-notepad.notes.v1", ""));
+            evaluate("window.Worker=window.__testSaveWorker;delete window.__testSaveWorker");
+            evaluate("(()=>{const e=document.querySelector('.note-title');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'復旧後の保存タイトル');e.dispatchEvent(new Event('input',{bubbles:true}));})()");
+            eventually("document.querySelector('.note-toolbar')?.textContent.includes('自動保存')");
+            assertTrue(prefs.getString("quantum-notepad.notes.v1", "").contains("復旧後の保存タイトル"));
+            scenario.recreate();
+            eventually("document.querySelector('.note-title')?.value === '復旧後の保存タイトル'");
+        } finally { scenario.close(); }
+    }
+
     @Test public void offlineEditingWorkersAndNativeStorageSurviveActivityRecreation() throws Exception {
         InstrumentationRegistry.getInstrumentation().getTargetContext().getSharedPreferences("CapacitorStorage", 0).edit().clear().commit();
         scenario = ActivityScenario.launch(MainActivity.class);

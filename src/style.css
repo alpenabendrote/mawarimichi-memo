@@ -49,6 +49,8 @@ button:disabled { color: #aaa; cursor: default; }
 .quantum-details { border-top: 1px solid #ddd; font-size: 12px; }
 .quantum-details > summary { cursor: pointer; padding: 12px 0; width: fit-content; color: #555; }
 .quantum-content { padding-bottom: 10px; }
+.save-details select { max-width: 100%; font: inherit; border: 1px solid #ccc; background: white; padding: 3px 5px; }
+.save-details .quantum-caption { overflow-wrap: anywhere; }
 .measurement-position { display: flex; gap: 12px; align-items: center; margin: 5px 0 12px; }
 .measurement-position label { white-space: nowrap; }
 .measurement-position input { flex: 1; min-width: 30px; accent-color: #666; }

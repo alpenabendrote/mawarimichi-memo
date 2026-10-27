@@ -23,6 +23,8 @@ import { SedimentPanel } from './SedimentPanel';
 import { CoolingPanel } from './CoolingPanel';
 import { coolingPayload, removeCooledNote, startCoolingDeletion, type CoolingActivity } from './coolingDeletion';
 import CoolingWorker from './quantum/cooling.worker?worker&inline';
+import { useQuantumSave } from './useQuantumSave';
+import { SavePanel } from './SavePanel';
 
 function initialNotebook(provided?: LoadedNotebook) {
   if (provided) return { ...provided, notes: initializeZenoNotes(coalesceSediments(provided.notes), Date.now()) };
@@ -39,9 +41,10 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   const [activeId, setActiveId] = useState<string | null>(initial.notes[0]?.id ?? null);
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [saveError, setSaveError] = useState<string | null>(initial.error);
+  const savingState = useQuantumSave(notes, initial.writable, persist);
+  const saveError = initial.error ?? savingState.error;
+  const [saveDetailsOpen, setSaveDetailsOpen] = useState(false);
   const [message, setMessage] = useState('');
-  const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
@@ -75,14 +78,6 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
 
   useEffect(() => () => { duplicateJob.current?.cancel(); coolingJob.current?.cancel(); }, []);
 
-  useEffect(() => {
-    if (!initial.writable) return;
-    let current = true; setSaving(true);
-    persist(notes).then(() => { if (current) { setSaveError(null); setSaving(false); } }).catch(() => {
-      if (current) { setSaveError('保存できません。JSONを書き出して内容を保存してください。'); setSaving(false); }
-    });
-    return () => { current = false; };
-  }, [notes, initial.writable, persist]);
 
   function cancelCooling() {
     if (!coolingJob.current) return;
@@ -257,7 +252,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
       {sedimentation.undo && <div role="status" className="notice">{sedimentation.undo.sourceIds.length}件のメモが堆積しました。<button className="link-button" onClick={sedimentation.restore} disabled={!sedimentation.canUndo} title={sedimentation.canUndo ? undefined : "堆積への追記・編集、IDの重複、または件数上限のため戻せません。"}>取り込みを戻す</button><button className="dismiss" aria-label="堆積の通知を閉じる" onClick={sedimentation.dismiss}>×</button></div>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       <>
-        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : saving ? '保存中…' : '自動保存'}</span><div>{active && trace && <><button onClick={deleteNote} disabled={cooling?.status === 'running' || !initial.writable} aria-busy={cooling?.status === 'running'}>{cooling?.status === 'running' ? '消去中…' : '削除'}</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></>}</div></header>
+        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : savingState.activity?.status === 'writing' ? '保存中…' : savingState.saving ? '訂正中…' : '自動保存'}</span><div>{active && trace && <><button onClick={deleteNote} disabled={cooling?.status === 'running' || !initial.writable} aria-busy={cooling?.status === 'running'}>{cooling?.status === 'running' ? '消去中…' : '削除'}</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></>}</div></header>
         <div className="view-switch" role="group" aria-label="表示する欄">
           <button aria-pressed={view === 'note'} aria-controls="note-pane" onClick={() => setView('note')}>メモ</button>
           <button aria-pressed={view === 'calculation'} aria-controls="calculation-pane" onClick={() => setView('calculation')}>回路・計算</button>
@@ -267,6 +262,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
             {active && trace ? <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} /> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
           </section>
           <section id="calculation-pane" className="calculation-pane" aria-label="回路・計算欄" tabIndex={0}>
+            <SavePanel activity={savingState.activity} open={saveDetailsOpen} onOpenChange={setSaveDetailsOpen} />
             <SedimentPanel notes={notes} run={sedimentation.run} status={sedimentation.status} open={sedimentDetailsOpen} onOpenChange={setSedimentDetailsOpen} />
             <CoolingPanel activity={cooling} open={coolingDetailsOpen} onOpenChange={setCoolingDetailsOpen} />
             {active && trace && <><QuantumPanel trace={trace} notes={orderedNotes.map(note => ({ id: note.id, title: noteTitle(note) }))} step={measurementStep} onStep={setMeasurementStep} />
