@@ -74,7 +74,7 @@ public class OfflineNotebookTest {
             assertTrue(corrected.contains("訂正後に保存されたタイトル"));
             assertFalse(corrected.contains("編集中1"));
             assertEquals("true", evaluate("document.querySelector('.save-details').open"));
-            assertEquals("true", evaluate("document.querySelector('.save-details').textContent.includes('5量子ビット')"));
+            assertEquals("true", evaluate("document.querySelector('.save-details svg')?.getAttribute('aria-label').includes('5量子ビット') && document.querySelectorAll('.save-details svg .wire').length === 5"));
             evaluate("(()=>{const e=document.querySelector('#save-stage');e.value='5';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()");
             assertEquals("Viewing a recorded stage must not save again", corrected, prefs.getString("quantum-notepad.notes.v1", ""));
             // A worker creation failure must leave the previous persisted snapshot in place.
