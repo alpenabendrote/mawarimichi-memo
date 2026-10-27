@@ -10,7 +10,7 @@
 
 メモ・量子計算は端末内で処理します。AndroidアプリはINTERNET権限を持たず、EmojiCompatのフォント自動取得を無効にしています。参考資料を開いた外部ブラウザ、JSON書き出しでユーザーが選択した共有先、開発時のnpm・Gradleは別に通信することがあります。
 
-ビルド時に実行用npm依存の実際のLICENSE・NOTICEを収集し、ヘルプ・Web配布物・単独HTML・APKに含めます。Androidでは解決済みAAR/JARの追加LICENSE・NOTICEも回収し、APKのassets/native-third-party-notices.txtに保存します。新しい種類のネイティブ依存はライセンス確認までビルドを停止します。依存を更新する場合はライセンス条件も再確認してください。
+ビルド時に実行用npm依存の実際のLICENSE・NOTICEを収集し、ヘルプ・Web配布物・単独HTML・APKに含めます。Androidでは解決済みAAR/JARの追加LICENSE・NOTICEも回収し、APKのassets/native-third-party-notices.txtに保存します。新しい種類のネイティブ依存はライセンス確認までビルドを停止します。依存を更新する場合はライセンス条件も再確認してください。確認したネイティブ依存はバージョン単位で licenses/native-components.json に記録し、未確認のバージョンはビルドを停止します。内部に取り込まれたChromium・別作者のMITコード・生成ヘルパーの帰属表示と、テンプレートに残るAndroidロボット画像のCC BY 3.0も同梱しています。今回の照合範囲と出典は [LICENSE_REVIEW.md](LICENSE_REVIEW.md) を参照してください。
 
 開発用xcodeが使うuuidは、CommonJSの互換性を保つ修正版11.1.1に限定しています。通常のアプリ画面には含まれません。
 

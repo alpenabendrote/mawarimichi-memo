@@ -3,8 +3,14 @@ import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8').replace(/\r\n/g, '\n').trimEnd();
 const lock = JSON.parse(read('package-lock.json'));
+// These vendored notices are in source headers, not the package's root LICENSE.
+const sourceHeader = path => {
+  const header = read(path).match(/^\/\*\*?([\s\S]*?)\*\//)?.[1];
+  if (!header) throw Error('Missing third-party source header: ' + path);
+  return header.split('\n').map(line => line.replace(/^\s*\* ?/, '')).join('\n').trim();
+};
 const sections = [
-  '遠回りメモ — licenses and third-party notices\n\nThe original application is MIT licensed. Third-party components retain their own licenses.\nBuild tools run during development; their generated browser helpers are attributed separately below.',
+  '遠回りメモ — licenses and third-party notices\n\nThe original application is MIT licensed. Third-party components retain their own licenses.\nBuild tools run during development; generated browser helpers and retained template assets are attributed separately below.',
   'Original application\n\n' + read('LICENSE'),
 ];
 for (const [path, pkg] of Object.entries(lock.packages).sort(([a], [b]) => a.localeCompare(b, 'en'))) {
@@ -20,10 +26,20 @@ for (const [path, pkg] of Object.entries(lock.packages).sort(([a], [b]) => a.loc
 }
 for (const [name, license] of [['vite', 'LICENSE.md'], ['rolldown', 'LICENSE']]) {
   const pkg = JSON.parse(read('node_modules/' + name + '/package.json'));
-  // Only browser helpers are emitted, not the tool or its bundled build-time dependencies.
+  // Attribute emitted helpers, including the upstream notices for derived Rolldown code.
   const text = read('node_modules/' + name + '/' + license).split('\n# Licenses of bundled dependencies')[0].trimEnd();
   sections.push(name + '@' + pkg.version + ' — generated browser helpers\n\n' + text);
+  if (name === 'rolldown') sections.push('Rolldown-derived helpers — Rollup and esbuild notices\n\n' + read('node_modules/rolldown/THIRD-PARTY-LICENSE'));
 }
+const capacitorVersion = lock.packages['node_modules/@capacitor/android'].version;
+const capacitorSource = 'node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/';
+const fileUtils = sourceHeader(capacitorSource + 'FileUtils.java');
+if (!fileUtils.includes('Copyright (c) 2017 Ivan Pusic') || !fileUtils.includes('Permission is hereby granted')) throw Error('Review FileUtils license header');
+sections.push('@capacitor/android@' + capacitorVersion + ' — FileUtils.java (APK only)\nPortions adopted from react-native-image-crop-picker. Header retained from the installed package.\n\n' + fileUtils);
+if (!read(capacitorSource + 'AndroidProtocolHandler.java').startsWith('// Copyright 2012 The Chromium Authors.')) throw Error('Review Chromium source header');
+sections.push('@capacitor/android@' + capacitorVersion + ' — AndroidProtocolHandler.java (APK only)\nBSD-3-Clause; copyright and terms from the Chromium 2012 source distribution.\nhttps://github.com/chromium/chromium/blob/20.0.1132.57/LICENSE\n\n' + read('licenses/chromium-LICENSE.txt'));
+for (const name of ['UriMatcher.java', 'WebViewLocalServer.java']) sections.push('@capacitor/android@' + capacitorVersion + ' — ' + name + ' (APK only)\nApache-2.0; the full Apache license follows below.\n\n' + sourceHeader(capacitorSource + name));
+sections.push('Android robot template artwork (repository and APK resource only)\nandroid/app/src/main/res/drawable-v24/ic_launcher_foreground.xml\nThis unused template resource is retained unchanged from @capacitor/cli@8.5.3; it is a white-vector adaptation with a shadow. It is separate from the app’s original memo icon and from the application’s MIT-licensed code.\n\nThe Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.\n\nSource and attribution guidance: https://developer.android.com/distribute/marketing-tools/brand-guidelines#android-robot\nLicense: https://creativecommons.org/licenses/by/3.0/\nAndroid is a trademark of Google LLC.\n\n' + read('licenses/CC-BY-3.0.txt'));
 sections.push('Android native components (APK only)\n\nAndroidX libraries, Kotlin standard library, Kotlin coroutines, JetBrains annotations, Apache Cordova, JSpecify annotations, and Google Guava/Error Prone support libraries (when resolved): Apache License 2.0.\nThe exact resolved native component versions and additional LICENSE/NOTICE files from their AAR/JAR archives are collected at build time in the APK asset native-third-party-notices.txt.\n\nApache Cordova NOTICE\n\n' + read('licenses/cordova-NOTICE.txt') + '\n\nKotlin\nCopyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.\n\nCapacitor includes WebViewLocalServer code under Apache License 2.0:\nCopyright 2015 Google Inc. All rights reserved.\n\n' + read('licenses/Apache-2.0.txt'));
 sections.push('io.ionic.libs:ionfilesystem-android:1.1.1 (APK only)\nhttps://github.com/ionic-team/ion-android-filesystem\n\n' + read('licenses/ionfilesystem-LICENSE.txt'));
 sections.push('Gradle wrapper (repository/build tooling only)\nhttps://gradle.org/\nApache License 2.0. The wrapper JAR retains its embedded META-INF/LICENSE, and the launch scripts retain their original headers.');

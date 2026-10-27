@@ -1,5 +1,7 @@
 """Check the actual release APK rather than just the source manifest."""
 import sys
+import json
+from pathlib import Path
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 
@@ -19,6 +21,19 @@ with ZipFile(apk_path) as apk:
         text = apk.read(name).decode("utf-8")
         assert "Permission is hereby granted" in text, name
     native = apk.read("assets/native-third-party-notices.txt").decode("utf-8")
+    expected = Path("THIRD_PARTY_NOTICES.txt").read_text(encoding="utf-8").strip()
+    notices = apk.read("assets/public/THIRD_PARTY_NOTICES.txt").decode("utf-8").strip()
+    assert notices == expected, "APK notices differ from the generated source notices"
+    assert apk.read("assets/public/LICENSE").decode("utf-8").strip() == Path("LICENSE").read_text(encoding="utf-8").strip()
+    assert expected in native, "Native notice asset lost the complete shared notices"
+    for credit in ["Copyright (c) 2017 Ivan Pusic", "Copyright (c) 2012 The Chromium Authors.",
+                   "Neither the name of Google Inc.", "Copyright (c) 2020 Evan Wallace",
+                   "The Android robot is reproduced or modified", "Attribution 3.0 Unported"]:
+        assert credit in notices, "Missing embedded third-party notice: " + credit
+    reviewed = json.loads(Path("licenses/native-components.json").read_text(encoding="utf-8"))["components"]
+    for component, metadata in reviewed.items():
+        assert component + "\nDeclared license: " + metadata["license"] in native, component
+
     for expected in ["org.apache.cordova:framework:14.0.1", "The Apache Software Foundation",
                      "Meta Platforms", "io.ionic.libs:ionfilesystem-android:1.1.1",
                      "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION"]:

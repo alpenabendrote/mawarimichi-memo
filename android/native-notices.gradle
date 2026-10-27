@@ -10,10 +10,7 @@ def nativeNotices = tasks.register('generateNativeNotices', NativeNoticesTask) {
     outputs.upToDateWhen { false }
     doLast {
         def sections = []
-        def approvedApache = { String group ->
-            group.startsWith('androidx.') ||
-            group in ['org.jetbrains', 'org.jetbrains.kotlin', 'org.jetbrains.kotlinx', 'org.apache.cordova', 'org.jspecify', 'com.google.guava', 'com.google.errorprone']
-        }
+        def reviewed = new groovy.json.JsonSlurper().parse(rootProject.file('../licenses/native-components.json')).components
         def addZipNotices
         addZipNotices = { byte[] bytes, String origin ->
             def zip = new java.util.zip.ZipInputStream(new ByteArrayInputStream(bytes))
@@ -35,15 +32,13 @@ def nativeNotices = tasks.register('generateNativeNotices', NativeNoticesTask) {
         def artifacts = configurations.releaseRuntimeClasspath.incoming.artifactView {
             componentFilter { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
         }.artifacts.artifacts.sort { it.id.componentIdentifier.toString() }
-        def unknown = artifacts.findAll {
-            def id = it.id.componentIdentifier
-            !approvedApache(id.group) && !(id.group == 'io.ionic.libs' && id.module == 'ionfilesystem-android' && id.version == '1.1.1')
-        }
+        def unknown = artifacts.findAll { !reviewed.containsKey(it.id.componentIdentifier.toString()) }
         logger.lifecycle('Native notice inventory: ' + artifacts.collect { it.id.componentIdentifier }.join(', '))
         if (unknown) throw new GradleException('Review native licenses before distributing: ' + unknown.collect { it.id.componentIdentifier }.join(', '))
         artifacts.each { artifact ->
             def id = artifact.id.componentIdentifier
-            sections << id.toString() + '\nDeclared license: ' + (approvedApache(id.group) ? 'Apache-2.0' : 'MIT')
+            def entry = reviewed[id.toString()]
+            sections << id.toString() + '\nDeclared license: ' + entry.license + '\nLicense source: ' + entry.source + (entry.additionalSource ? '\nAdditional license source: ' + entry.additionalSource : '')
             addZipNotices(artifact.file.bytes, id.toString())
         }
         sections << rootProject.file('../THIRD_PARTY_NOTICES.txt').getText('UTF-8')
