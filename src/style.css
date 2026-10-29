@@ -6,22 +6,26 @@ button { cursor: pointer; border: 1px solid #ccc; background: #fff; border-radiu
 button:hover:not(:disabled) { background: #f3f3f3; }
 button:disabled { color: #aaa; cursor: default; }
 :focus-visible { outline: 2px solid #666; outline-offset: 2px; }
-.notepad { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: 100dvh; overflow: hidden; }
+.notepad { display: grid; grid-template-columns: 210px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; height: 100dvh; overflow: hidden; }
 .sidebar { min-height: 0; border-right: 1px solid #ddd; padding: 18px 12px; display: flex; flex-direction: column; gap: 16px; }
 .list-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .list-header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+.note-count { color: #777; font-size: 11px; white-space: nowrap; }
+.list-header, .filter { flex-shrink: 0; }
 .filter { width: 100%; min-width: 0; border: 1px solid #ddd; border-radius: 2px; padding: 6px 8px; font-size: 12px; }
 .note-list { flex: 1; min-height: 0; overflow-y: auto; }
 .note-list button { display: flex; align-items: baseline; gap: 8px; width: 100%; border: 0; background: transparent; text-align: left; padding: 9px 8px; font-size: 13px; white-space: nowrap; border-radius: 0; }
 .note-list-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dormant-label { margin-left: auto; flex-shrink: 0; font-size: 10px; color: #888; }
 .note-list button.selected { background: #eee; }
-.list-footer { border-top: 1px solid #eee; padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #777; }
-.list-footer > * { white-space: nowrap; }
+.app-footer { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; border-top: 1px solid #eee; padding: 6px 12px max(6px, env(safe-area-inset-bottom)); background: white; }
+.app-footer > * { white-space: nowrap; }
+.app-footer .link-button { padding: 6px 0; }
 .link-button { background: none; border: 0; padding: 0; text-decoration: underline; font-size: 12px; color: #666; }
 .main { min-width: 0; min-height: 0; padding: 10px 24px; display: flex; flex-direction: column; }
-.note-toolbar { flex-shrink: 0; background: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #eee; }
-.note-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.note-toolbar { flex-shrink: 0; background: white; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid #eee; }
+.note-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
+.save-status { margin-left: auto; white-space: nowrap; }
 .note-toolbar button { white-space: nowrap; }
 .note-toolbar .muted { font-size: 11px; }
 .observe-button { border-color: #777; }
@@ -98,12 +102,14 @@ code { font: 11px ui-monospace, Consolas, monospace; }
   .view-switch button[aria-pressed="true"] { color: #222; border-bottom-color: #555; }
 }
 @media (max-width: 650px) {
-  .notepad { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .sidebar { max-height: min(230px, 36dvh); padding: 10px 16px; border-right: 0; border-bottom: 1px solid #ddd; gap: 6px; }
+  .notepad { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
+  .sidebar { max-height: min(200px, 30dvh); padding: 10px 16px; border-right: 0; border-bottom: 1px solid #ddd; gap: 6px; }
   .list-header h1 { font-size: 14px; }
   .note-list { max-height: 100px; }
   .note-list button { padding: 6px 8px; }
-  .list-footer { padding-top: 7px; }
+  .app-footer { padding-left: 16px; padding-right: 16px; gap: 18px; }
+  .note-toolbar { padding: 6px 0; }
+  .note-actions button { min-height: 44px; padding: 5px 8px; }
   .main { padding: 0 16px 8px; }
   .note-title { font-size: 18px; }
   .measurement-position { gap: 8px; }

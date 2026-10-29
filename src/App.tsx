@@ -241,10 +241,9 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   return <div className="notepad">
     <a className="skip-link" href="#note-editor">本文へ移動</a>
     <aside className="sidebar" aria-label="メモ一覧">
-      <header className="list-header"><h1>遠回りメモ</h1><button onClick={newNote} disabled={notes.length >= MAX_NOTES}>新規</button></header>
+      <header className="list-header"><h1>遠回りメモ</h1><span className="note-count" aria-label={`メモ${notes.length}件、上限${MAX_NOTES}件`}>{notes.length} / {MAX_NOTES}</span></header>
       <input className="filter" aria-label="タイトルを絞り込む" placeholder="タイトルを絞り込む" value={filter} onChange={event => setFilter(event.target.value)} />
       <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{note.sediment && <small className="dormant-label">堆積</small>}{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
-      <footer className="list-footer"><span>{notes.length} / {MAX_NOTES}</span><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes} disabled={exporting}>JSONを書き出す</button><button className="link-button" disabled={!initial.writable || importing} onClick={() => importRef.current?.click()}>JSONを読み込む</button></footer>
     </aside>
     <input ref={importRef} type="file" accept="application/json,.json" disabled={importing || !initial.writable} hidden aria-label="読み込むJSONファイル" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void importNotes(file); }} />
     <main className="main">
@@ -252,14 +251,20 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
       {sedimentation.undo && <div role="status" className="notice">{sedimentation.undo.sourceIds.length}件のメモが堆積しました。<button className="link-button" onClick={sedimentation.restore} disabled={!sedimentation.canUndo} title={sedimentation.canUndo ? undefined : "堆積への追記・編集、IDの重複、または件数上限のため戻せません。"}>取り込みを戻す</button><button className="dismiss" aria-label="堆積の通知を閉じる" onClick={sedimentation.dismiss}>×</button></div>}
       {deleted && <div role="status" className="notice">削除しました。<button className="link-button" onClick={undoDelete} disabled={notes.length >= MAX_NOTES}>元に戻す</button><button className="dismiss" aria-label="削除の通知を閉じる" onClick={() => setDeleted(null)}>×</button></div>}
       <>
-        <header className="note-toolbar"><span className="muted">{saveError ? '未保存' : savingState.activity?.status === 'writing' ? '保存中…' : savingState.saving ? '訂正中…' : '自動保存'}</span><div>{active && trace && <><button onClick={deleteNote} disabled={cooling?.status === 'running' || !initial.writable} aria-busy={cooling?.status === 'running'}>{cooling?.status === 'running' ? '消去中…' : '削除'}</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button className="observe-button" onClick={observe}>量子検索</button></>}</div></header>
+        <header className="note-toolbar">
+          <div className="note-actions" role="group" aria-label="メモの操作">
+            <button onClick={newNote} disabled={notes.length >= MAX_NOTES}>新規</button>
+            {active && trace && <><button className="observe-button" onClick={observe}>量子検索</button><button onClick={openNextNote} disabled={notes.length < 2} title={notes.length < 2 ? '別のメモが必要です。' : undefined}>おまかせ</button><button onClick={duplicateNote} disabled={notes.length >= MAX_NOTES || duplication?.status === 'running'} aria-busy={duplication?.status === 'running'} title={notes.length >= MAX_NOTES ? `メモは最大${MAX_NOTES}件です。` : undefined}>複製</button><button onClick={deleteNote} disabled={cooling?.status === 'running' || !initial.writable} aria-busy={cooling?.status === 'running'}>{cooling?.status === 'running' ? '消去中…' : '削除'}</button></>}
+          </div>
+          <span className="save-status muted">{saveError ? '未保存' : savingState.activity?.status === 'writing' ? '保存中…' : savingState.saving ? '訂正中…' : '自動保存'}</span>
+        </header>
         <div className="view-switch" role="group" aria-label="表示する欄">
           <button aria-pressed={view === 'note'} aria-controls="note-pane" onClick={() => setView('note')}>メモ</button>
           <button aria-pressed={view === 'calculation'} aria-controls="calculation-pane" onClick={() => setView('calculation')}>回路・計算</button>
         </div>
         <div className={`workspace view-${view}`}>
           <section id="note-pane" className="note-pane" aria-label="メモ欄" tabIndex={0}>
-            {active && trace ? <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} /> : <div className="empty"><p>新規メモを作成してください。</p><button onClick={newNote}>新規</button></div>}
+            {active && trace ? <NoteEditor note={active} bodyVisible={openedId === active.id} titleRef={titleRef} transferTarget={transferTarget} onChange={editNote} onHide={() => { clearDuplicate(); setOpenedId(null); setMessage(''); }} /> : <div className="empty"><p>上の「新規」でメモを作成してください。</p></div>}
           </section>
           <section id="calculation-pane" className="calculation-pane" aria-label="回路・計算欄" tabIndex={0}>
             <SavePanel activity={savingState.activity} open={saveDetailsOpen} onOpenChange={setSaveDetailsOpen} />
@@ -276,6 +281,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
       </>
       <p className="observation-message" role="status">{message}</p>
     </main>
+    <footer className="app-footer" aria-label="ヘルプとデータ管理"><button className="link-button" onClick={() => setHelpOpen(true)}>ヘルプ</button><button className="link-button" onClick={exportNotes} disabled={exporting}>JSONを書き出す</button><button className="link-button" disabled={!initial.writable || importing} onClick={() => importRef.current?.click()}>JSONを読み込む</button></footer>
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
   </div>;
 }
