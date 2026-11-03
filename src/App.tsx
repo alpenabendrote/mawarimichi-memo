@@ -41,6 +41,8 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   const [activeId, setActiveId] = useState<string | null>(initial.notes[0]?.id ?? null);
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [listExpanded, setListExpanded] = useState(false);
+  const listRef = useRef<HTMLElement>(null);
   const savingState = useQuantumSave(notes, initial.writable, persist);
   const saveError = initial.error ?? savingState.error;
   const [saveDetailsOpen, setSaveDetailsOpen] = useState(false);
@@ -77,6 +79,9 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   const visibleNotes = display.filter(({ note }) => noteTitle(note).toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
 
   useEffect(() => () => { duplicateJob.current?.cancel(); coolingJob.current?.cancel(); }, []);
+  useEffect(() => {
+    if (!listExpanded) listRef.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activeId, listExpanded, filter]);
 
 
   function cancelCooling() {
@@ -89,6 +94,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
     duplicateJob.current?.cancel(); duplicateJob.current = null; setDuplication(null);
   }
   function selectNote(id: string) {
+    setListExpanded(false);
     clearDuplicate();
     setNotes(previous => previous.map(note => note.id === id ? touchNote(note, Date.now()) : note));
     setActiveId(id); setOpenedId(null); setMeasurementStep(null); setMessage('');
@@ -97,6 +103,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   }
   function newNote() {
     if (notes.length >= MAX_NOTES) return;
+    setListExpanded(false);
     clearDuplicate();
     const now = Date.now();
     const note: Note = { id: crypto.randomUUID(), title: '', body: '', updatedAt: new Date(now).toISOString(), zeno: newZenoMemory(now) };
@@ -162,6 +169,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
       const raw = await file.text();
       const result = mergeNotebookBackup(currentNotebook.current.notes, raw);
       if (result.added) {
+        setListExpanded(false);
         clearDuplicate();
         const now = Date.now();
         setNotes(initializeZenoNotes(result.notes, now)); setListTime(now);
@@ -173,6 +181,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
   }
   function observe() {
     if (!active) return;
+    setListExpanded(false);
     clearDuplicate();
     try {
       const start = performance.now();
@@ -199,6 +208,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
 
   function duplicateNote() {
     if (!active || notes.length >= MAX_NOTES || duplication?.status === 'running') return;
+    setListExpanded(false);
     const source = { ...active };
     const payload = duplicatePayload(source);
     clearDuplicate(); setMessage('');
@@ -227,6 +237,7 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
 
   function openNextNote() {
     if (!active || notes.length < 2) return;
+    setListExpanded(false);
     clearDuplicate();
     try {
       const run = runWalk(notes.length, target);
@@ -240,10 +251,10 @@ export function App({ notebook, persist = saveNotebook }: { notebook?: LoadedNot
 
   return <div className="notepad">
     <a className="skip-link" href="#note-editor">本文へ移動</a>
-    <aside className="sidebar" aria-label="メモ一覧">
-      <header className="list-header"><h1>遠回りメモ</h1><span className="note-count" aria-label={`メモ${notes.length}件、上限${MAX_NOTES}件`}>{notes.length} / {MAX_NOTES}</span></header>
+    <aside className={`sidebar${listExpanded ? ' list-expanded' : ''}`} aria-label="メモ一覧">
+      <header className="list-header"><h1>遠回りメモ</h1><div className="list-header-controls"><span className="note-count" aria-label={`メモ${notes.length}件、上限${MAX_NOTES}件`}>{notes.length} / {MAX_NOTES}</span><button className="list-toggle" aria-expanded={listExpanded} aria-controls="saved-note-list" onClick={() => setListExpanded(previous => !previous)}>{listExpanded ? '一覧を戻す' : '一覧を広げる'}</button></div></header>
       <input className="filter" aria-label="タイトルを絞り込む" placeholder="タイトルを絞り込む" value={filter} onChange={event => setFilter(event.target.value)} />
-      <nav aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{note.sediment && <small className="dormant-label">堆積</small>}{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
+      <nav id="saved-note-list" ref={listRef} aria-label="保存したメモ" className="note-list">{visibleNotes.map(({ note, dormant, normalProbability }) => <button key={note.id} className={note.id === activeId ? 'selected' : ''} aria-label={noteTitle(note)} title={`通常の確率 ${(normalProbability * 100).toFixed(2)}%${dormant ? '・休眠寄り' : ''}（一覧の更新時点）`} aria-current={note.id === activeId ? 'page' : undefined} onClick={() => selectNote(note.id)}><span className="note-list-title">{noteTitle(note)}</span>{note.sediment && <small className="dormant-label">堆積</small>}{dormant && <small className="dormant-label">休眠寄り</small>}</button>)}{visibleNotes.length === 0 && <p className="muted">{filter ? '該当するメモはありません。' : 'メモはありません。'}</p>}</nav>
     </aside>
     <input ref={importRef} type="file" accept="application/json,.json" disabled={importing || !initial.writable} hidden aria-label="読み込むJSONファイル" onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void importNotes(file); }} />
     <main className="main">

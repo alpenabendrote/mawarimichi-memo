@@ -10,6 +10,8 @@ button:disabled { color: #aaa; cursor: default; }
 .sidebar { min-height: 0; border-right: 1px solid #ddd; padding: 18px 12px; display: flex; flex-direction: column; gap: 16px; }
 .list-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .list-header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+.list-header-controls { display: flex; align-items: center; gap: 10px; }
+.list-toggle { display: none; }
 .note-count { color: #777; font-size: 11px; white-space: nowrap; }
 .list-header, .filter { flex-shrink: 0; }
 .filter { width: 100%; min-width: 0; border: 1px solid #ddd; border-radius: 2px; padding: 6px 8px; font-size: 12px; }
@@ -103,9 +105,13 @@ code { font: 11px ui-monospace, Consolas, monospace; }
 }
 @media (max-width: 650px) {
   .notepad { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
-  .sidebar { max-height: min(200px, 30dvh); padding: 10px 16px; border-right: 0; border-bottom: 1px solid #ddd; gap: 6px; }
+  .sidebar { max-height: min(270px, 36dvh); padding: 10px 16px; border-right: 0; border-bottom: 1px solid #ddd; gap: 6px; }
   .list-header h1 { font-size: 14px; }
-  .note-list { max-height: 100px; }
+  .list-toggle { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+  .note-list { max-height: 160px; }
+  /* Keep space for the action bar and footer even with a short viewport. */
+  .sidebar.list-expanded { height: min(60dvh, max(36dvh, calc(100dvh - 210px))); max-height: none; }
+  .sidebar.list-expanded .note-list { max-height: none; }
   .note-list button { padding: 6px 8px; }
   .app-footer { padding-left: 16px; padding-right: 16px; gap: 18px; }
   .note-toolbar { padding: 6px 0; }
